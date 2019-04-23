@@ -14,12 +14,12 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
     PADDING_NAMES = ["SAME", "VALID"]
 
     def __init__(self,
-                 number_of_units,
                  number_of_filters,
                  kernel_size,
                  alpha=1e-3,
                  beta=0.75,
                  normalization_feature_maps=8,
+                 strides=1,
                  initializer_forward=None,
                  initializer_recurrent=None,
                  initializer_bias=None,
@@ -27,11 +27,10 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
                  **kwargs
                  ):
 
-        self.build = False
         self.rank = 2
         self.number_of_filters = number_of_filters
-        self.number_of_units = int(number_of_units)
-        self.cell_states = np.zeros((number_of_units, 1))
+        # self.number_of_units = int(number_of_units)
+        # self.cell_states = np.zeros((number_of_units, 1))
         self.kernel_size = conv_utils.normalize_tuple(kernel_size, self.rank, "kernel_size")
 
         if not padding:
@@ -41,6 +40,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
             raise ValueError("Padding must be set either to 'valid' or to 'valid'")
 
         self.padding = padding.upper()
+        self.strides = conv_utils.normalize_tuple(strides, self.rank, 'strides')
 
         initializer = tf.contrib.layers.variance_scaling_initializer(dtype=tf.float32)
         if initializer_forward:
@@ -72,18 +72,23 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
         # assuming that channels are always at last
         input_dim = int(input_shape[-1])
 
-        kernel_shape = self.kernel_size + (input_dim, self.filters)
+        kernel_shape = self.kernel_size + (input_dim, self.number_of_filters)
+
+        self.number_of_units = ((input_shape[1] - kernel_shape[0]) / float(self.strides[0]) + 1)*\
+                               ((input_shape[2] - kernel_shape[1]) / float(self.strides[0]) + 1)
+
+        self.cell_states = np.zeros((self.number_of_units, self.number_of_filters))
 
         self.forward_kernel = self.add_weight(
             name="forward_kernel",
-            shape=(int(input_shape[-1]), kernel_shape),
+            shape=kernel_shape,
             initializer= self.initializer_forward,
             trainable=True
         )
 
         self.recurrent_kernel = self.add_weight(
             name="recurrent_kernel",
-            shape=(self.number_of_units, kernel_shape),
+            shape=kernel_shape,
             initializer=self.initializer_recurrent,
             trainable=True
         )
@@ -103,13 +108,13 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
         )
 
         self.conv_recurrent= nn_ops.Convolution(
-            input_shape=self.number_of_units,
+            input_shape,
             filter_shape=self.recurrent_kernel.get_shape(),
             strides=self.strides,
             padding=self.padding
         )
 
-        self.build = True
+        self.built = True
 
     def call(self, inputs, **kwargs):
         output_forward = self.conv_forward(inputs, self.conv_forward)
@@ -131,5 +136,28 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
         return outputs
 
+    def compute_output_shape(self, input_shape):
+        input_shape = tensor_shape.TensorShape(input_shape).as_list()
+        space = input_shape[1:-1]
+        new_space = []
+
+        for i in range(len(space)):
+            new_dim = conv_utils.conv_output_length(
+                space[i],
+                self.kernel_size[i],
+                padding=self.padding.lower(),
+                stride=self.strides[i]
+            )
+            new_space.append(new_dim)
+        return tensor_shape.TensorShape(
+            [input_shape[0]] +
+            new_space +
+            [self.number_of_filters]
+        )
+
+if __name__ == "__main__":
+    model = tf.keras.models.Sequential()
+    model.add(RecurrentConvolutionalLayer(32, (3, 3), input_shape=(28, 28, 1)))
+    model.summary()
 
 
