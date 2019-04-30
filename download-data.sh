@@ -1,17 +1,40 @@
 #!/usr/bin/env bash
 
-unameOut="$(uname -s)"
+OS_NAME ="$(uname -s)"
 
-case "${unameOut}" in
-    Linux*)     sudo apt-get update && sudo apt-get install curl;;
-    CYGWIN*)    sudo apt-get update && sudo apt-get install curl;;
-    MINGW*)     sudo apt-get update && sudo apt-get install curl;;
-esac
+if ["$OS_NAME" == "Linux"]; then
+    sudo apt-get update && sudo apt-get install curl
+fi
 
-rm -rf data/
-mkdir data
-curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz -o data/cifar-10-batches-py.tar.gz
-tar -xvzf data/cifar-10-batches-py.tar.gz -C data/
+DATA_DIRECTORY="DATA"
+if [! -d "$DATA_DIRECTORY"]; then
+  mkdir data
+fi
 
-curl https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz -o data/cifar-100-batches-py.tar.gz
-tar -xzvf data/cifar-100-batches-py.tar.gz -C data/
+CIFAR_10_DIRECTORY="cifar-10-batches-py"
+if [! -d "$CIFAR_10_DIRECTORY"]; then
+    curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz -o data/cifar-10-batches-py.tar.gz
+    tar -xvzf data/cifar-10-batches-py.tar.gz -C data/
+fi
+
+CIFAR_100_DIRECTORY="cifar-100-batches-py"
+if [! -d "$CIFAR_100_DIRECTORY"]; then
+    curl https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz -o data/cifar-100-batches-py.tar.gz
+    tar -xzvf data/cifar-100-batches-py.tar.gz -C data/
+fi
+
+MNIST_DIRECTORY="mnist"
+if [! -d "$MNIST_DIRECTORY"]; then
+    mkdir mnist
+    curl yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz -o data/mnist-train-images.tar.gz
+    tar -xzvf data/mnist-train-images.tar.gz -C data/
+
+    curl yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz -o data/mnist-train-labels.tar.gz
+    tar -xzvf data/mnist-train-labels.tar.gz -C data/
+
+    curl yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz -o data/mnist-test-images.tar.gz
+    tar -xzvf data/mnist-test-images.tar.gz -C data/
+
+    curl yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz -o data/mnist-test-labels.tar.gz
+    tar -xzvf data/mnist-test-labels.tar.gz -C data/
+fi
