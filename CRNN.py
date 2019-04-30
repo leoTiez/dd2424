@@ -3,7 +3,6 @@ from tensorflow.python import nn_ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.utils import conv_utils
 import cPickle
-
 import numpy as np
 
 # Enable eager execution
@@ -34,13 +33,11 @@ def pre_process_cifar_data(cifar_data):
         np.ones(cifar_data.shape[0])
     )).T.astype(RecurrentConvolutionalLayer.PRECISION_NP)
 
-    cifar_data = (cifar_data - np.min(cifar_data)) / (np.max(cifar_data) - np.min(cifar_data))
+    R = cifar_data[:, 0:1024]
+    G = cifar_data[:, 1024:2048]
+    B = cifar_data[:, 2048:]
 
-    R = cifar_data[0:1024].reshape(32, 32)
-    G = cifar_data[1024:2048].reshape(32, 32)
-    B = cifar_data[2048:].reshape(32, 32)
-
-    cifar_data = np.dstack((R, G, B))
+    cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
 
     return cifar_data
 
@@ -248,7 +245,7 @@ if __name__ == "__main__":
 
     cifar_dict = load_cifar('data_batch_1')
     training_data = cifar_dict['data']
-    training_data = np.asarray([pre_process_cifar_data(training_data[0])])
-    training_labels = np.asarray([cifar_dict['labels'][0]])
+    training_data = np.asarray(pre_process_cifar_data(training_data))
+    training_labels = cifar_dict['labels']
     model.fit(training_data, training_labels, epochs=5)
 
