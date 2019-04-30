@@ -2,44 +2,12 @@ import tensorflow as tf
 from tensorflow.python import nn_ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.utils import conv_utils
-import cPickle
 import numpy as np
+from load_data import load_cifar, load_mnist, pre_process_cifar_data, pre_process_mnist_data
+
 
 # Enable eager execution
 tf.enable_eager_execution()
-
-
-def load_cifar(file_name, file_path='./data//cifar-10-batches-py/'):
-    """
-    Loads the cifar data file
-    :param file_name: name of the file
-    :param file_path: path to the cifar data file
-    :return: The cifar data as a dictionary
-    """
-    with open(str(file_path + file_name), 'rb') as fo:
-        data_dict = cPickle.load(fo)
-    data_dict['data'] = np.asarray(data_dict['data'], dtype=RecurrentConvolutionalLayer.PRECISION_NP)
-    data_dict['labels'] = np.asarray(data_dict['labels'], dtype=RecurrentConvolutionalLayer.PRECISION_NP)
-    return data_dict
-
-
-def pre_process_cifar_data(cifar_data):
-    mean = np.mean(cifar_data, axis=0)
-    std = np.std(cifar_data, axis=0)
-    batch_size = cifar_data.shape[0]
-
-    cifar_data = ((cifar_data.T - np.outer(mean, np.ones(cifar_data.shape[0]))) / np.outer(
-        std + np.finfo(RecurrentConvolutionalLayer.PRECISION_NP).eps,
-        np.ones(cifar_data.shape[0])
-    )).T.astype(RecurrentConvolutionalLayer.PRECISION_NP)
-
-    R = cifar_data[:, 0:1024]
-    G = cifar_data[:, 1024:2048]
-    B = cifar_data[:, 2048:]
-
-    cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
-
-    return cifar_data
 
 
 class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
@@ -131,7 +99,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
             dtype=RecurrentConvolutionalLayer.PRECISION_NP
         )
 
-        recurrent_shape = tensor_shape.TensorShape([None, self.unit_dim[0], self.unit_dim[1], None])
+        recurrent_shape = tensor_shape.TensorShape([None, self.unit_dim[1], self.unit_dim[2], None])
         recurrent_kernel_shape = self.kernel_size + (1, 1)
 
         self.forward_kernel = self.add_weight(
@@ -179,13 +147,15 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
         # TODO: How to invoke recurrent execution again?
         self.cell_states = np.zeros(self.cell_states.shape, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
 
+        outputs = None
         for _ in range(self.depth):
             output_recurrent = np.zeros(
-                (1, self.unit_dim[0], self.unit_dim[1], self.number_of_filters),
+                (1, self.unit_dim[1], self.unit_dim[2], self.number_of_filters),
                 dtype=RecurrentConvolutionalLayer.PRECISION_NP
             )
-            for num, feature_map in enumerate(output_recurrent.transpose(3, 2, 1, 0)):
-                output_recurrent[:, :, :, num:num+1] = self.conv_recurrent(np.asarray([feature_map]), self.recurrent_kernel)
+            for num, feature_map in enumerate(output_recurrent.transpose([3, 2, 1, 0])):
+                recurrent_result = self.conv_recurrent(np.asarray([feature_map]), self.recurrent_kernel)
+                output_recurrent[:, :, :, num:num+1] = recurrent_result.numpy().transpose([3, 2, 1, 0])
 
             outputs = tf.add(output_forward, output_recurrent)
             outputs = nn_ops.bias_add(outputs, self.bias, data_format='NHWC')
@@ -228,7 +198,7 @@ if __name__ == "__main__":
         32,
         (3, 3),
         execution_depth=3,
-        input_shape=(32, 32, 3)
+        input_shape=(28, 28, 1)
     ))
     model.summary()
 
@@ -243,9 +213,15 @@ if __name__ == "__main__":
         metrics=['accuracy']
     )
 
-    cifar_dict = load_cifar('data_batch_1')
-    training_data = cifar_dict['data']
-    training_data = np.asarray(pre_process_cifar_data(training_data))
-    training_labels = cifar_dict['labels']
+    # cifar_dict = load_cifar('data_batch_1', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # training_data = cifar_dict['data']
+    # training_data = pre_process_cifar_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # training_labels = cifar_dict['labels']
+
+    mnist_dict = load_mnist('train', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    training_data = mnist_dict['data']
+    training_data = pre_process_mnist_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    training_labels = mnist_dict['labels']
+
     model.fit(training_data, training_labels, epochs=5)
 
