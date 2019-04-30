@@ -55,6 +55,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
     def __init__(self,
                  number_of_filters,
                  kernel_size,
+                 execution_depth=3,
                  alpha=1e-3,
                  beta=0.75,
                  normalization_feature_maps=8,
@@ -79,6 +80,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
         self.padding = padding.upper()
         self.strides = conv_utils.normalize_tuple(strides, self.rank, 'strides')
+        self.depth = execution_depth
 
         initializer = tf.contrib.layers.variance_scaling_initializer(dtype=RecurrentConvolutionalLayer.PRECISION_TF)
         if initializer_forward:
@@ -178,25 +180,28 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         output_forward = self.conv_forward(inputs, self.forward_kernel)
         # TODO: How to invoke recurrent execution again?
-        output_recurrent = np.zeros(
-            (1, self.unit_dim[0], self.unit_dim[1], self.number_of_filters),
-            dtype=RecurrentConvolutionalLayer.PRECISION_NP
-        )
-        for num, feature_map in enumerate(output_recurrent.transpose(3, 2, 1, 0)):
-            output_recurrent[:, :, :, num:num+1] = self.conv_recurrent(np.asarray([feature_map]), self.recurrent_kernel)
+        self.cell_states = np.zeros(self.cell_states.shape, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
 
-        outputs = tf.add(output_forward, output_recurrent)
-        outputs = nn_ops.bias_add(outputs, self.bias, data_format='NHWC')
+        for _ in range(self.depth):
+            output_recurrent = np.zeros(
+                (1, self.unit_dim[0], self.unit_dim[1], self.number_of_filters),
+                dtype=RecurrentConvolutionalLayer.PRECISION_NP
+            )
+            for num, feature_map in enumerate(output_recurrent.transpose(3, 2, 1, 0)):
+                output_recurrent[:, :, :, num:num+1] = self.conv_recurrent(np.asarray([feature_map]), self.recurrent_kernel)
 
-        # apply local response normalization and relu as proposed in the paper
-        self.cell_states = tf.nn.local_response_normalization(
-            tf.maximum(0, outputs),
-            depth_radius=self.normalization_feature_maps,
-            bias=1,
-            alpha=self.alpha,
-            beta=self.beta,
-            name="lrn"
-        )
+            outputs = tf.add(output_forward, output_recurrent)
+            outputs = nn_ops.bias_add(outputs, self.bias, data_format='NHWC')
+
+            # apply local response normalization and relu as proposed in the paper
+            self.cell_states = tf.nn.local_response_normalization(
+                tf.maximum(0, outputs),
+                depth_radius=self.normalization_feature_maps,
+                bias=1,
+                alpha=self.alpha,
+                beta=self.beta,
+                name="lrn"
+            )
 
         return outputs
 
@@ -222,7 +227,12 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
 if __name__ == "__main__":
     model = tf.keras.models.Sequential()
-    model.add(RecurrentConvolutionalLayer(32, (3, 3), input_shape=(32, 32, 3)))
+    model.add(RecurrentConvolutionalLayer(
+        32,
+        (3, 3),
+        execution_depth=3,
+        input_shape=(32, 32, 3)
+    ))
     model.summary()
 
     model.add(tf.keras.layers.Flatten())
