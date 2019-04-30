@@ -3,7 +3,6 @@ from tensorflow.python import nn_ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.utils import conv_utils
 import cPickle
-
 import numpy as np
 
 # Enable eager execution
@@ -34,13 +33,11 @@ def pre_process_cifar_data(cifar_data):
         np.ones(cifar_data.shape[0])
     )).T.astype(RecurrentConvolutionalLayer.PRECISION_NP)
 
-    cifar_data = (cifar_data - np.min(cifar_data)) / (np.max(cifar_data) - np.min(cifar_data))
+    R = cifar_data[:, 0:1024]
+    G = cifar_data[:, 1024:2048]
+    B = cifar_data[:, 2048:]
 
-    R = cifar_data[0:1024].reshape(32, 32)
-    G = cifar_data[1024:2048].reshape(32, 32)
-    B = cifar_data[2048:].reshape(32, 32)
-
-    cifar_data = np.dstack((R, G, B))
+    cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
 
     return cifar_data
 
@@ -55,6 +52,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
     def __init__(self,
                  number_of_filters,
                  kernel_size,
+                 execution_depth=3,
                  alpha=1e-3,
                  beta=0.75,
                  normalization_feature_maps=8,
@@ -79,6 +77,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
         self.padding = padding.upper()
         self.strides = conv_utils.normalize_tuple(strides, self.rank, 'strides')
+        self.depth = execution_depth
 
         initializer = tf.contrib.layers.variance_scaling_initializer(dtype=RecurrentConvolutionalLayer.PRECISION_TF)
         if initializer_forward:
@@ -178,25 +177,28 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
     def call(self, inputs, **kwargs):
         output_forward = self.conv_forward(inputs, self.forward_kernel)
         # TODO: How to invoke recurrent execution again?
-        output_recurrent = np.zeros(
-            (1, self.unit_dim[0], self.unit_dim[1], self.number_of_filters),
-            dtype=RecurrentConvolutionalLayer.PRECISION_NP
-        )
-        for num, feature_map in enumerate(output_recurrent.transpose(3, 2, 1, 0)):
-            output_recurrent[:, :, :, num:num+1] = self.conv_recurrent(np.asarray([feature_map]), self.recurrent_kernel)
+        self.cell_states = np.zeros(self.cell_states.shape, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
 
-        outputs = tf.add(output_forward, output_recurrent)
-        outputs = nn_ops.bias_add(outputs, self.bias, data_format='NHWC')
+        for _ in range(self.depth):
+            output_recurrent = np.zeros(
+                (1, self.unit_dim[0], self.unit_dim[1], self.number_of_filters),
+                dtype=RecurrentConvolutionalLayer.PRECISION_NP
+            )
+            for num, feature_map in enumerate(output_recurrent.transpose(3, 2, 1, 0)):
+                output_recurrent[:, :, :, num:num+1] = self.conv_recurrent(np.asarray([feature_map]), self.recurrent_kernel)
 
-        # apply local response normalization and relu as proposed in the paper
-        self.cell_states = tf.nn.local_response_normalization(
-            tf.maximum(0, outputs),
-            depth_radius=self.normalization_feature_maps,
-            bias=1,
-            alpha=self.alpha,
-            beta=self.beta,
-            name="lrn"
-        )
+            outputs = tf.add(output_forward, output_recurrent)
+            outputs = nn_ops.bias_add(outputs, self.bias, data_format='NHWC')
+
+            # apply local response normalization and relu as proposed in the paper
+            self.cell_states = tf.nn.local_response_normalization(
+                tf.maximum(0, outputs),
+                depth_radius=self.normalization_feature_maps,
+                bias=1,
+                alpha=self.alpha,
+                beta=self.beta,
+                name="lrn"
+            )
 
         return outputs
 
@@ -222,7 +224,12 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
 if __name__ == "__main__":
     model = tf.keras.models.Sequential()
-    model.add(RecurrentConvolutionalLayer(32, (3, 3), input_shape=(32, 32, 3)))
+    model.add(RecurrentConvolutionalLayer(
+        32,
+        (3, 3),
+        execution_depth=3,
+        input_shape=(32, 32, 3)
+    ))
     model.summary()
 
     model.add(tf.keras.layers.Flatten())
@@ -238,7 +245,7 @@ if __name__ == "__main__":
 
     cifar_dict = load_cifar('data_batch_1')
     training_data = cifar_dict['data']
-    training_data = np.asarray([pre_process_cifar_data(training_data[0])])
-    training_labels = np.asarray([cifar_dict['labels'][0]])
+    training_data = np.asarray(pre_process_cifar_data(training_data))
+    training_labels = cifar_dict['labels']
     model.fit(training_data, training_labels, epochs=5)
 

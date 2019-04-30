@@ -15,12 +15,14 @@ CIFAR_10_DIRECTORY="cifar-10-batches-py"
 if [! -d "$CIFAR_10_DIRECTORY"]; then
     curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz -o data/cifar-10-batches-py.tar.gz
     tar -xvzf data/cifar-10-batches-py.tar.gz -C data/
+    rm -rf data/cifar-10-batches-py.tar.gz
 fi
 
 CIFAR_100_DIRECTORY="cifar-100-batches-py"
 if [! -d "$CIFAR_100_DIRECTORY"]; then
     curl https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz -o data/cifar-100-batches-py.tar.gz
     tar -xzvf data/cifar-100-batches-py.tar.gz -C data/
+    rm -rf data/cifar-10-batches-py.tar.gz
 fi
 
 MNIST_DIRECTORY="mnist"
