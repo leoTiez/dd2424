@@ -1,19 +1,39 @@
 #!/usr/bin/env bash
 
-unameOut="$(uname -s)"
+OS_NAME="$(uname -s)"
 
-case "${unameOut}" in
-    Linux*)     sudo apt-get update && sudo apt-get install curl;;
-    CYGWIN*)    sudo apt-get update && sudo apt-get install curl;;
-    MINGW*)     sudo apt-get update && sudo apt-get install curl;;
-esac
+if [[ "$OS_NAME" == "Linux" ]]; then
+    sudo apt-get update && sudo apt-get install curl
+fi
 
-rm -rf data/
-mkdir data
-curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz -o data/cifar-10-batches-py.tar.gz
-tar -xvzf data/cifar-10-batches-py.tar.gz -C data/
-rm -rf data/cifar-10-batches-py.tar.gz
+DATA_DIRECTORY="data"
+if [[ ! -d "$DATA_DIRECTORY" ]]; then
+  mkdir "$DATA_DIRECTORY"
+fi
 
-curl https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz -o data/cifar-100-batches-py.tar.gz
-tar -xzvf data/cifar-100-batches-py.tar.gz -C data/
-rm -rf data/cifar-10-batches-py.tar.gz
+CIFAR_10_DIRECTORY="${DATA_DIRECTORY}/cifar-10-batches-py"
+if [[ ! -d "$CIFAR_10_DIRECTORY" ]]; then
+    curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz -o "$DATA_DIRECTORY"/cifar-10-batches-py.tar.gz
+    tar -xvf "$DATA_DIRECTORY"/cifar-10-batches-py.tar.gz -C "$DATA_DIRECTORY"/
+    rm -rf "$DATA_DIRECTORY"/cifar-10-batches-py.tar.gz
+fi
+
+CIFAR_100_DIRECTORY="${DATA_DIRECTORY}/cifar-100-python"
+if [[ ! -d "$CIFAR_100_DIRECTORY" ]]; then
+    curl https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz -o "$DATA_DIRECTORY"/cifar-100-batches-py.tar.gz
+    tar -xvf "$DATA_DIRECTORY"/cifar-100-batches-py.tar.gz -C "$DATA_DIRECTORY"
+    rm -rf "$DATA_DIRECTORY"/cifar-100-batches-py.tar.gz
+fi
+
+MNIST_DIRECTORY="${DATA_DIRECTORY}/mnist"
+if [[ ! -d "$MNIST_DIRECTORY" ]]; then
+    mkdir $MNIST_DIRECTORY
+    curl yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz -o \
+        $MNIST_DIRECTORY/mnist-train-images.gz
+    curl yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz -o \
+        $MNIST_DIRECTORY/mnist-train-labels.gz
+    curl yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz -o \
+        $MNIST_DIRECTORY/mnist-test-images.gz
+    curl yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz -o \
+        $MNIST_DIRECTORY/mnist-test-labels.gz
+fi
