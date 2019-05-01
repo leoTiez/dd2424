@@ -1,8 +1,7 @@
 # Deep Learning Project
-## Recurrent Convolutional Neural Network for Object Recognition 
+## Recurrent Convolutional Neural Network for Object Recognition
 
-### Pre requirements
-Please install:
+### Requirements
 - Pyhton 2.7
 - NumPy
 - TensorFlow
@@ -48,7 +47,7 @@ RecurrentConvolutionalLayer(
 
 Please remember to adapt the input size when using a new data set.
 
-The layer can be added to existing network definitions, or can be 
+The layer can be added to existing network definitions, or can be
 stacked together with other layers.
 
 
