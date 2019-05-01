@@ -8,21 +8,21 @@ fi
 
 DATA_DIRECTORY="data"
 if [[ ! -d "$DATA_DIRECTORY" ]]; then
-  mkdir $DATA_DIRECTORY
+  mkdir "$DATA_DIRECTORY"
 fi
 
 CIFAR_10_DIRECTORY="${DATA_DIRECTORY}/cifar-10-batches-py"
 if [[ ! -d "$CIFAR_10_DIRECTORY" ]]; then
-    curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz -o data/cifar-10-batches-py.tar.gz
-    tar -xvf data/cifar-10-batches-py.tar.gz -C data/
-    rm -rf data/cifar-10-batches-py.tar.gz
+    curl https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz -o "$DATA_DIRECTORY"/cifar-10-batches-py.tar.gz
+    tar -xvf "$DATA_DIRECTORY"/cifar-10-batches-py.tar.gz -C "$DATA_DIRECTORY"/
+    rm -rf "$DATA_DIRECTORY"/cifar-10-batches-py.tar.gz
 fi
 
 CIFAR_100_DIRECTORY="${DATA_DIRECTORY}/cifar-100-python"
 if [[ ! -d "$CIFAR_100_DIRECTORY" ]]; then
-    curl https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz -o data/cifar-100-batches-py.tar.gz
-    tar -xvf data/cifar-100-batches-py.tar.gz -C $DATA_DIRECTORY
-    rm -rf data/cifar-100-batches-py.tar.gz
+    curl https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz -o "$DATA_DIRECTORY"/cifar-100-batches-py.tar.gz
+    tar -xvf "$DATA_DIRECTORY"/cifar-100-batches-py.tar.gz -C "$DATA_DIRECTORY"
+    rm -rf "$DATA_DIRECTORY"/cifar-100-batches-py.tar.gz
 fi
 
 MNIST_DIRECTORY="${DATA_DIRECTORY}/mnist"
