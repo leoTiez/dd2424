@@ -3,7 +3,7 @@ from tensorflow.python import nn_ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.keras.utils import conv_utils
 import numpy as np
-from load_data import load_cifar, load_mnist, pre_process_cifar_data, pre_process_mnist_data
+from load_data import load_cifar, load_mnist, preprocess_cifar_data, preprocess_mnist_data
 
 
 # Enable eager execution
@@ -215,12 +215,12 @@ if __name__ == "__main__":
 
     # cifar_dict = load_cifar('data_batch_1', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     # training_data = cifar_dict['data']
-    # training_data = pre_process_cifar_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # training_data = preprocess_cifar_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     # training_labels = cifar_dict['labels']
 
     mnist_dict = load_mnist('train', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     training_data = mnist_dict['data']
-    training_data = pre_process_mnist_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    training_data = preprocess_mnist_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     training_labels = mnist_dict['labels']
 
     model.fit(training_data, training_labels, epochs=5)

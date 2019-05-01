@@ -13,7 +13,7 @@ def load_mnist(file_name, dtype, file_path="./data/mnist/"):
     return data_dict
 
 
-def pre_process_mnist_data(mnist_data, dtype):
+def preprocess_mnist_data(mnist_data, dtype):
     mean = np.mean(mnist_data, axis=0)
     std = np.std(mnist_data, axis=0)
 
@@ -34,7 +34,7 @@ def load_cifar(file_name, dtype, file_path='./data/cifar-10-batches-py/'):
     return data_dict
 
 
-def pre_process_cifar_data(cifar_data, dtype):
+def preprocess_cifar_data(cifar_data, dtype):
     mean = np.mean(cifar_data, axis=0)
     std = np.std(cifar_data, axis=0)
     batch_size = cifar_data.shape[0]
