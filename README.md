@@ -5,7 +5,6 @@
 - Pyhton 2.7
 - NumPy
 - TensorFlow
-- cPickle
 
 It is recommended to use the `requirements.txt` file for the installation. Run
 
