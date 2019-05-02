@@ -193,30 +193,62 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
 
 if __name__ == "__main__":
+    input_shape = (28, 28, 1)
     model = tf.keras.models.Sequential()
+    model.add(tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=input_shape))
+    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+
     model.add(RecurrentConvolutionalLayer(
         32,
         (3, 3),
         execution_depth=3,
-        input_shape=(28, 28, 1)
+        input_shape=input_shape
     ))
-    model.summary()
+    model.add(RecurrentConvolutionalLayer(
+        32,
+        (3, 3),
+        execution_depth=3,
+        input_shape=input_shape
+    ))
+
+    model.add(tf.keras.layers.MaxPooling2D((2, 2)))
+
+    model.add(RecurrentConvolutionalLayer(
+        32,
+        (3, 3),
+        execution_depth=3,
+        input_shape=input_shape
+    ))
+    model.add(RecurrentConvolutionalLayer(
+        32,
+        (3, 3),
+        execution_depth=3,
+        input_shape=input_shape
+    ))
+
+    model.add(tf.keras.layers.GlobalMaxPool2D())
 
     model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.Dense(50, activation='relu'))
     model.add(tf.keras.layers.Dense(10, activation='softmax'))
+
     model.summary()
 
     model.compile(
         optimizer=tf.train.AdagradOptimizer(learning_rate=.1),
-        loss='sparse_categorical_crossentropy',
+        # loss='kullback_leibler_divergence',
+        loss='categorical_crossentropy',
         metrics=['accuracy']
     )
-
-    # cifar_dict = load_cifar('data_batch_1', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
-    # training_data = cifar_dict['data']
+    #
+    # cifar_dict_1 = load_cifar('data_batch_1', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # cifar_dict_2 = load_cifar('data_batch_2', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # cifar_dict_3 = load_cifar('data_batch_3', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # cifar_dict_4 = load_cifar('data_batch_4', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    #
+    # training_data = np.concatenate((cifar_dict_1['data'], cifar_dict_2['data'], cifar_dict_3['data'], cifar_dict_4['data']))
     # training_data = preprocess_cifar_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
-    # training_labels = cifar_dict['labels']
+    # training_labels = np.concatenate((cifar_dict_1['labels'], cifar_dict_2['labels'], cifar_dict_3['labels'], cifar_dict_4['labels']))
+
 
     mnist_dict = load_mnist('train', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     training_data = mnist_dict['data']
@@ -224,4 +256,9 @@ if __name__ == "__main__":
     training_labels = mnist_dict['labels']
 
     model.fit(training_data, training_labels, epochs=5)
+
+    # cifar_dict_test = load_cifar('test_batch', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # test_data = preprocess_cifar_data(cifar_dict_test['data'], dtype=RecurrentConvolutionalLayer.PRECISION_NP)
+    # test_labels = cifar_dict_test['labels']
+    # model.evaluate(test_data, test_labels)
 
