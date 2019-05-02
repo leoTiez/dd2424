@@ -17,20 +17,23 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
     PRECISION_NP= np.float32
     PRECISION_TF= tf.float32
 
-    def __init__(self,
-                 number_of_filters,
-                 kernel_size,
-                 execution_depth=3,
-                 alpha=1e-3,
-                 beta=0.75,
-                 normalization_feature_maps=8,
-                 strides=1,
-                 initializer_forward=None,
-                 initializer_recurrent=None,
-                 initializer_bias=None,
-                 padding="same",
-                 **kwargs
-                 ):
+    def __init__(
+            self,
+            number_of_filters,
+            kernel_size,
+            execution_depth=3,
+            alpha=1e-3,
+            beta=0.75,
+            normalization_feature_maps=10,
+            strides=1,
+            initializer_forward=None,
+            initializer_recurrent=None,
+            initializer_bias=None,
+            padding="same",
+            **kwargs
+    ):
+
+        super(RecurrentConvolutionalLayer, self).__init__(**kwargs)
 
         self.built = False
         self.rank = 2
@@ -70,7 +73,6 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
             raise ValueError("Number of normalization feature maps must be smaller that the number of filters")
         self.normalization_feature_maps = normalization_feature_maps
 
-        super(RecurrentConvolutionalLayer, self).__init__(**kwargs)
 
     def build(self, input_shape):
         input_shape = tensor_shape.TensorShape(input_shape)
@@ -105,7 +107,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
         self.forward_kernel = self.add_weight(
             name="forward_kernel",
             shape=kernel_shape,
-            initializer= self.initializer_forward,
+            initializer=self.initializer_forward,
             trainable=True,
             dtype=RecurrentConvolutionalLayer.PRECISION_TF
         )
@@ -128,7 +130,7 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
         self.conv_forward = nn_ops.Convolution(
             input_shape=input_shape,
-            filter_shape=self.forward_kernel.get_shape(),
+            filter_shape=self.forward_kernel.shape,
             strides=self.strides,
             padding=self.padding
         )
@@ -144,7 +146,6 @@ class RecurrentConvolutionalLayer(tf.keras.layers.Layer):
 
     def call(self, inputs, **kwargs):
         output_forward = self.conv_forward(inputs, self.forward_kernel)
-        # TODO: How to invoke recurrent execution again?
         self.cell_states = np.zeros(self.cell_states.shape, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
 
         outputs = None
@@ -204,6 +205,7 @@ if __name__ == "__main__":
         execution_depth=3,
         input_shape=input_shape
     ))
+
     model.add(RecurrentConvolutionalLayer(
         32,
         (3, 3),
@@ -235,8 +237,7 @@ if __name__ == "__main__":
 
     model.compile(
         optimizer=tf.train.AdagradOptimizer(learning_rate=.1),
-        # loss='kullback_leibler_divergence',
-        loss='categorical_crossentropy',
+        loss='kullback_leibler_divergence',
         metrics=['accuracy']
     )
     #
@@ -245,17 +246,32 @@ if __name__ == "__main__":
     # cifar_dict_3 = load_cifar('data_batch_3', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     # cifar_dict_4 = load_cifar('data_batch_4', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     #
-    # training_data = np.concatenate((cifar_dict_1['data'], cifar_dict_2['data'], cifar_dict_3['data'], cifar_dict_4['data']))
-    # training_data = preprocess_cifar_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
-    # training_labels = np.concatenate((cifar_dict_1['labels'], cifar_dict_2['labels'], cifar_dict_3['labels'], cifar_dict_4['labels']))
-
+    # training_data = np.concatenate((
+    #     cifar_dict_1['data'],
+    #     cifar_dict_2['data'],
+    #     cifar_dict_3['data'],
+    #     cifar_dict_4['data']
+    # ))
+    # training_labels = np.concatenate((
+    #     cifar_dict_1['labels'],
+    #     cifar_dict_2['labels'],
+    #     cifar_dict_3['labels'],
+    #     cifar_dict_4['labels']
+    # ))
+    # training_data, training_labels = preprocess_cifar_data(
+    #     training_data,
+    #     training_labels,
+    #     dtype=RecurrentConvolutionalLayer.PRECISION_NP
+    # )
 
     mnist_dict = load_mnist('train', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     training_data = mnist_dict['data']
-    training_data = preprocess_mnist_data(training_data, dtype=RecurrentConvolutionalLayer.PRECISION_NP)
-    training_labels = mnist_dict['labels']
+    training_data, training_labels = preprocess_mnist_data(
+        training_data, mnist_dict['labels'],
+        dtype=RecurrentConvolutionalLayer.PRECISION_NP
+    )
 
-    model.fit(training_data, training_labels, epochs=5)
+    model.fit(training_data, training_labels, epochs=1)
 
     # cifar_dict_test = load_cifar('test_batch', dtype=RecurrentConvolutionalLayer.PRECISION_NP)
     # test_data = preprocess_cifar_data(cifar_dict_test['data'], dtype=RecurrentConvolutionalLayer.PRECISION_NP)
