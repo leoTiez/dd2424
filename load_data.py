@@ -1,4 +1,5 @@
 from tensorflow.contrib.learn.python.learn.datasets.mnist import extract_images, extract_labels
+from tensorflow.python.keras.utils import to_categorical
 import cPickle
 import numpy as np
 
@@ -13,11 +14,11 @@ def load_mnist(file_name, dtype, file_path="./data/mnist/"):
     return data_dict
 
 
-def preprocess_mnist_data(mnist_data, dtype):
+def preprocess_mnist_data(mnist_data, mnist_labels, dtype):
     mean = np.mean(mnist_data, axis=0)
     std = np.std(mnist_data, axis=0)
 
-    return (mnist_data - mean) / (std + np.finfo(dtype).eps)
+    return (mnist_data - mean) / (std + np.finfo(dtype).eps), to_categorical(mnist_labels, num_classes=10)
 
 
 def load_cifar(file_name, dtype, file_path='./data/cifar-10-batches-py/'):
@@ -34,7 +35,7 @@ def load_cifar(file_name, dtype, file_path='./data/cifar-10-batches-py/'):
     return data_dict
 
 
-def preprocess_cifar_data(cifar_data, dtype):
+def preprocess_cifar_data(cifar_data, cifar_labels, dtype):
     mean = np.mean(cifar_data, axis=0)
     std = np.std(cifar_data, axis=0)
     batch_size = cifar_data.shape[0]
@@ -47,6 +48,6 @@ def preprocess_cifar_data(cifar_data, dtype):
 
     cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
 
-    return cifar_data
+    return cifar_data, to_categorical(cifar_labels, num_classes=10)
 
 
