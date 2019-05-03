@@ -1,9 +1,10 @@
-from tensorflow.contrib.learn.python.learn.datasets.mnist import extract_images, extract_labels
+from tensorflow.contrib.learn.python.learn.datasets.mnist import extract_images, \
+    extract_labels
 import cPickle
 import numpy as np
 from os import environ, path, listdir
 import tensorflow as tf
-
+import csv
 
 DATA_DIR = './data'
 if 'DATA_DIRECTORY' in environ:
@@ -57,21 +58,38 @@ def preprocess_cifar_data(cifar_data, dtype):
     return cifar_data
 
 
-def _parse_ims(filename, label):
+def _tinynet_parse_ims(filename, label):
     image_string = tf.read_file(filename)
-    im = tf.image.decode_jpeg(image_string)
+    im = tf.image.decode_jpeg(image_string, channels=3)
+    im = tf.dtypes.cast(im, tf.float32)
     im /= 255.0
     return im, label
 
 
-def load_tinynet_train(dtype=None, file_path=DATA_DIR + '/tinynet/'):
+def _tinynet_build_id_map(file_path):
     ids = sorted(open(path.join(file_path, 'wnids.txt')).read().splitlines())
-    id_map = {ids[i]: i for i in range(len(ids))}
+    return {ids[i]: i for i in range(len(ids))}
 
+
+def _tinynet_build_val_map(val_file, id_map):
+    val_map = {}
+    with open(val_file) as annotations:
+        reader = csv.reader(annotations, delimiter='\t')
+        for row in reader:
+            # so will be filename => id
+            val_map[row[0]] = id_map[row[1]]
+    return val_map
+
+
+TINYNET_DIR = '/tinynet/'
+
+
+def load_tinynet_train(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
+    id_map = _tinynet_build_id_map(file_path)
     im_locs = []
     im_labels = []
 
-    for anId in ids:
+    for anId in id_map:
         im_dir = path.join(file_path, 'train', anId, 'images')
         # all the file names
         im_files = listdir(im_dir)
@@ -82,5 +100,23 @@ def load_tinynet_train(dtype=None, file_path=DATA_DIR + '/tinynet/'):
     labels = tf.constant(im_labels)
 
     dataset = tf.data.Dataset.from_tensor_slices((fnames, labels))
-    return dataset.map(_parse_ims)
+    return dataset.map(_tinynet_parse_ims)
 
+
+def load_tinynet_test(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
+    id_map = _tinynet_build_id_map(file_path)
+    val_map = _tinynet_build_val_map(
+        path.join(file_path, 'val/val_annotations.txt'), id_map
+    )
+
+    fpaths = []
+    ids = []
+    for f in val_map:
+        fpaths.append(path.join(file_path, 'val/images', f))
+        ids.append(val_map[f])
+
+    vpaths = tf.constant(fpaths)
+    vlabels = tf.constant(ids)
+    dataset = tf.data.Dataset.from_tensor_slices((vpaths, vlabels))
+
+    return dataset.map(_tinynet_parse_ims)
