@@ -165,7 +165,7 @@ if __name__ == '__main__':
     # For the large scale tests it should not be an issue anymore and the test size can be increased
     batch_size_ = 100
     test_data_size_ = 2000
-    num_filter_ = 32
+    num_filter_ = 64
 
     # Load and transform the data
     mnist_dict_ = load_mnist('train', dtype=PRECISION_NP)
@@ -177,6 +177,10 @@ if __name__ == '__main__':
     )
     training_data_ = training_data_[:-test_data_size_]
     training_labels_ = training_labels_[:-test_data_size_]
+
+    # TODO rm these lines
+    training_data_ = training_data_[:10000]
+    training_labels_ = training_labels_[:10000]
 
     test_data_ = training_data_[-test_data_size_:]
     test_labels_ = training_labels_[-test_data_size_:]
@@ -190,11 +194,13 @@ if __name__ == '__main__':
     conv_layer_ = convolutional_layer(
         input_placeholder_,
         num_input_channels=1,
-        filter_shape=(3, 3),
+        filter_shape=(5, 5),
         num_filter=num_filter_,
         name='conv_layer_1'
     )
 
+    # First pooling layer
+    # Size 3 and stride 2, as proposed in the paper
     pooling_shape_1_ = (3, 3)
     striding_shape_1_ = (2, 2)
 
@@ -204,6 +210,7 @@ if __name__ == '__main__':
         stride=striding_shape_1_
     )
 
+    # Recurrent convolutional layers
     rcl_layer_1_ = rcl(
         input_data=pooling_1_,
         num_input_channels=num_filter_,
@@ -220,6 +227,8 @@ if __name__ == '__main__':
         name='rcl_layer_2'
     )
 
+    # Second pooling layer
+    # Size 3 and stride 2, as proposed in the paper
     pooling_shape_2_ = (3, 3)
     striding_shape_2_ = (2, 2)
 
@@ -229,6 +238,7 @@ if __name__ == '__main__':
         stride=striding_shape_2_
     )
 
+    # Recurrent convolutional layer
     rcl_layer_3_ = rcl(
         input_data=pooling_2_,
         num_input_channels=num_filter_,
@@ -245,21 +255,16 @@ if __name__ == '__main__':
         name='rcl_layer_4'
     )
 
-    # global_max_ = global_max_pooling_layer(rcl_layer_4_)
+    # Max pooling layer
+    global_max_ = global_max_pooling_layer(rcl_layer_4_)
 
-    # flattern_ = tf.reshape(global_max_, [-1, global_max_.shape[-1].value])
-    #
-    # result_, linear_trans_ = softmax_layer(
-    #     flattern_,
-    #     global_max_.shape[-1].value,
-    #     output_shape_[1]
-    # )
+    # Flatten tensor for softmax layer
+    flatten_ = tf.reshape(global_max_, [-1, global_max_.shape[-1].value])
 
-    flattern_ = tf.reshape(rcl_layer_4_, [-1, rcl_layer_4_.shape[1].value * rcl_layer_4_.shape[2].value * rcl_layer_4_.shape[3].value])
-
+    # Softmax layer
     result_, linear_trans_ = softmax_layer(
-        flattern_,
-        rcl_layer_4_.shape[1].value * rcl_layer_4_.shape[2].value * rcl_layer_4_.shape[3].value,
+        flatten_,
+        global_max_.shape[-1].value,
         output_shape_[1]
     )
 
@@ -270,6 +275,7 @@ if __name__ == '__main__':
 
     optimiser_ = tf.train.AdamOptimizer(learning_rate=learning_rate_).minimize(cross_entropy_)
 
+    # Accuracy
     accuracy_ = accuracy(
         output_placeholder_,
         result_
