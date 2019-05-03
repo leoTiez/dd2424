@@ -15,10 +15,11 @@ def load_mnist(file_name, dtype, file_path="./data/mnist/"):
 
 
 def preprocess_mnist_data(mnist_data, mnist_labels, dtype):
-    mean = np.mean(mnist_data, axis=0)
-    std = np.std(mnist_data, axis=0)
+    # mean = np.mean(mnist_data, axis=0)
+    # std = np.std(mnist_data, axis=0)
 
-    return (mnist_data - mean) / (std + np.finfo(dtype).eps), to_categorical(mnist_labels, num_classes=10)
+    # return (mnist_data - mean) / (std + np.finfo(dtype).eps), to_categorical(mnist_labels, num_classes=10)
+    return mnist_data / 255., to_categorical(mnist_labels, num_classes=10)
 
 
 def load_cifar(file_name, dtype, file_path='./data/cifar-10-batches-py/'):
@@ -40,11 +41,11 @@ def preprocess_cifar_data(cifar_data, cifar_labels, dtype):
     std = np.std(cifar_data, axis=0)
     batch_size = cifar_data.shape[0]
 
-    cifar_data = (cifar_data - mean) / (std - np.finfo(dtype).eps)
+    # cifar_data = (cifar_data - mean) / (std - np.finfo(dtype).eps)
 
-    R = cifar_data[:, 0:1024]
-    G = cifar_data[:, 1024:2048]
-    B = cifar_data[:, 2048:]
+    R = cifar_data[:, 0:1024] / 255.
+    G = cifar_data[:, 1024:2048] / 255.
+    B = cifar_data[:, 2048:] / 255.
 
     cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
 
