@@ -178,10 +178,6 @@ if __name__ == '__main__':
     training_data_ = training_data_[:-test_data_size_]
     training_labels_ = training_labels_[:-test_data_size_]
 
-    # TODO rm these lines
-    training_data_ = training_data_[:10000]
-    training_labels_ = training_labels_[:10000]
-
     test_data_ = training_data_[-test_data_size_:]
     test_labels_ = training_labels_[-test_data_size_:]
 
