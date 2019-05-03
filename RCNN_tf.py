@@ -188,6 +188,8 @@ if __name__ == '__main__':
     # Create input and output placeholder
     input_placeholder_ = tf.placeholder(PRECISION_TF, input_shape_)
     output_placeholder_ = tf.placeholder(PRECISION_TF, output_shape_)
+    # dropout probability placeholder
+    rate_placeholder_ = tf.placeholder(PRECISION_TF)
 
     # Net definition
     # First convolutional layer
@@ -219,8 +221,14 @@ if __name__ == '__main__':
         name='rcl_layer_1'
     )
 
+    dropout_1_ = tf.nn.dropout(
+        rcl_layer_1_,
+        rate=rate_placeholder_,
+        name='drop_1'
+    )
+
     rcl_layer_2_ = rcl(
-        input_data=rcl_layer_1_,
+        input_data=dropout_1_,
         num_input_channels=num_filter_,
         filter_shape=(3, 3),
         num_filter=num_filter_,
@@ -232,10 +240,17 @@ if __name__ == '__main__':
     pooling_shape_2_ = (3, 3)
     striding_shape_2_ = (2, 2)
 
+
     pooling_2_ = pooling_layer(
         input_data=rcl_layer_2_,
         pool_shape=pooling_shape_2_,
         stride=striding_shape_2_
+    )
+
+    dropout_2_ = tf.nn.dropout(
+        pooling_2_,
+        rate=rate_placeholder_,
+        name='drop_2'
     )
 
     # Recurrent convolutional layer
@@ -247,8 +262,14 @@ if __name__ == '__main__':
         name='rcl_layer_3'
     )
 
+    dropout_3_ = tf.nn.dropout(
+        rcl_layer_3_,
+        rate=rate_placeholder_,
+        name='drop_3'
+    )
+
     rcl_layer_4_ = rcl(
-        input_data=rcl_layer_3_,
+        input_data=dropout_3_,
         num_input_channels=num_filter_,
         filter_shape=(3, 3),
         num_filter=num_filter_,
@@ -297,14 +318,16 @@ if __name__ == '__main__':
                 _, cost_ = sess_.run([optimiser_, cross_entropy_],
                                      feed_dict={
                                          input_placeholder_: batch_x_,
-                                         output_placeholder_: batch_y_
+                                         output_placeholder_: batch_y_,
+                                         rate_placeholder_: 0.2
                                      })
                 avg_cost_ += cost_ / total_batch_
 
             test_acc_ = sess_.run(accuracy_,
                                   feed_dict={
                                       input_placeholder_: test_data_,
-                                      output_placeholder_: test_labels_
+                                      output_placeholder_: test_labels_,
+                                      rate_placeholder_: 0
                                   })
             print "\nEpoch:", (epoch + 1), \
                 "cost =", "{:.3f}".format(avg_cost_),\
@@ -314,5 +337,6 @@ if __name__ == '__main__':
         print sess_.run(accuracy_,
                         feed_dict={
                             input_placeholder_: test_data_,
-                            output_placeholder_: test_labels_
+                            output_placeholder_: test_labels_,
+                            rate_placeholder_: 0
                         })
