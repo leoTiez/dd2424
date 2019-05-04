@@ -27,13 +27,22 @@ fi
 
 MNIST_DIRECTORY="${DATA_DIRECTORY}/mnist"
 if [[ ! -d "$MNIST_DIRECTORY" ]]; then
-    mkdir $MNIST_DIRECTORY
+    mkdir "$MNIST_DIRECTORY"
     curl yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz -o \
-        $MNIST_DIRECTORY/mnist-train-images.gz
+        "$MNIST_DIRECTORY"/mnist-train-images.gz
     curl yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz -o \
-        $MNIST_DIRECTORY/mnist-train-labels.gz
+        "$MNIST_DIRECTORY"/mnist-train-labels.gz
     curl yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz -o \
-        $MNIST_DIRECTORY/mnist-test-images.gz
+        "$MNIST_DIRECTORY"/mnist-test-images.gz
     curl yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz -o \
-        $MNIST_DIRECTORY/mnist-test-labels.gz
+        "$MNIST_DIRECTORY"/mnist-test-labels.gz
 fi
+
+TINYNET_DIRECTORY="${DATA_DIRECTORY}/tinynet"
+if [[ ! -d "$TINYNET_DIRECTORY" ]]; then
+    mkdir $TINYNET_DIRECTORY
+    curl http://cs231n.stanford.edu/tiny-imagenet-200.zip -o \
+        $TINYNET_DIRECTORY/raw.zip
+    tar -xf $TINYNET_DIRECTORY/raw.zip -C $TINYNET_DIRECTORY --strip-components=1
+fi
+export DATA_DIRECTORY
