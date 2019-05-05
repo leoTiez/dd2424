@@ -171,7 +171,7 @@ if __name__ == '__main__':
     batch_size_ = 100
     test_data_size_ = 2000
     num_filter_ = 64
-    buffer_size=10000
+    buffer_size_ = 10000
 
     # Load and transform the data
     mnist_dict_ = load_mnist('train', dtype=PRECISION_NP)
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     test_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).batch(batch_size=batch_size_).shuffle(buffer_size=buffer_size)
+    )).batch(batch_size=batch_size_).shuffle(buffer_size=buffer_size_)
 
     # Create Iterator
     data_iterator_ = tf.data.Iterator.from_structure(training_data_set_.output_types, training_data_set_.output_shapes)
