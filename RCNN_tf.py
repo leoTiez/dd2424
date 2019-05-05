@@ -193,11 +193,11 @@ if __name__ == '__main__':
     training_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).repeat().batch(batch_size=batch_size_)
+    )).shuffle(buffer_size=buffer_size_).repeat().batch(batch_size=batch_size_)
     test_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).batch(batch_size=batch_size_).shuffle(buffer_size=buffer_size_)
+    )).shuffle(buffer_size=buffer_size_).batch(batch_size=batch_size_)
 
     # Create Iterator
     data_iterator_ = tf.data.Iterator.from_structure(training_data_set_.output_types, training_data_set_.output_shapes)
