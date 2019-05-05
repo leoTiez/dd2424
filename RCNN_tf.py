@@ -161,6 +161,7 @@ if __name__ == '__main__':
     batch_size_ = 100
     test_data_size_ = 2000
     num_filter_ = 64
+    buffer_size_ = 10000
 
     # Load and transform the data
     mnist_dict_ = load_mnist('train', dtype=PRECISION_NP)
@@ -182,7 +183,7 @@ if __name__ == '__main__':
     training_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).repeat().batch(batch_size=batch_size_)
+    )).repeat().batch(batch_size=batch_size_).shuffle(buffer_size=buffer_size_)
     test_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
