@@ -147,12 +147,7 @@ def accuracy(
         labels,
         result
 ):
-    correct_prediction = tf.equal(
-        tf.argmax(labels, axis=1),
-        tf.argmax(result, axis=1)
-    )
-
-    return tf.reduce_mean(tf.cast(correct_prediction, PRECISION_TF))
+    return tf.metrics.accuracy(labels=labels, predictions=result)[1]
 
 
 if __name__ == '__main__':
@@ -169,28 +164,44 @@ if __name__ == '__main__':
 
     # Load and transform the data
     mnist_dict_ = load_mnist('train', dtype=PRECISION_NP)
-    training_data_ = mnist_dict_['data']
-    training_data_, training_labels_ = preprocess_mnist_data(
-        training_data_,
+    training_data_np_, training_labels_np_ = preprocess_mnist_data(
+        mnist_dict_['data'],
         mnist_dict_['labels'],
         dtype=PRECISION_NP
     )
-    training_data_ = training_data_[:-test_data_size_]
-    training_labels_ = training_labels_[:-test_data_size_]
-
-    test_data_ = training_data_[-test_data_size_:]
-    test_labels_ = training_labels_[-test_data_size_:]
+    training_data_ = training_data_np_[:-test_data_size_]
+    training_labels_ = training_labels_np_[:-test_data_size_]
+    test_data_ = training_data_np_[-test_data_size_:]
+    test_labels_ = training_labels_np_[-test_data_size_:]
 
     # Create input and output placeholder
     input_placeholder_ = tf.placeholder(PRECISION_TF, input_shape_)
     output_placeholder_ = tf.placeholder(PRECISION_TF, output_shape_)
+
+    # Create data set objects
+    training_data_set_ = tf.data.Dataset.from_tensor_slices((
+        input_placeholder_,
+        output_placeholder_
+    )).repeat().batch(batch_size=batch_size_)
+    test_data_set_ = tf.data.Dataset.from_tensor_slices((
+        input_placeholder_,
+        output_placeholder_
+    )).batch(batch_size=batch_size_)
+
+    # Create Iterator
+    data_iterator_ = tf.data.Iterator.from_structure(training_data_set_.output_types, training_data_set_.output_shapes)
+    # Initialize iterators and get input and output placeholder variables
+    train_init_op_ = data_iterator_.make_initializer(training_data_set_)
+    test_init_op_ = data_iterator_.make_initializer(test_data_set_)
+    features_, labels_ = data_iterator_.get_next()
+
     # dropout probability placeholder
     rate_placeholder_ = tf.placeholder(PRECISION_TF)
 
     # Net definition
     # First convolutional layer
     conv_layer_ = convolutional_layer(
-        input_placeholder_,
+        features_,
         num_input_channels=1,
         filter_shape=(5, 5),
         num_filter=num_filter_,
@@ -287,52 +298,60 @@ if __name__ == '__main__':
 
     # cross entropy and accuracy matrix
     cross_entropy_ = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits_v2(logits=linear_trans_, labels=output_placeholder_)
+        tf.nn.softmax_cross_entropy_with_logits_v2(logits=linear_trans_, labels=labels_)
     )
 
     optimiser_ = tf.train.AdamOptimizer(learning_rate=learning_rate_).minimize(cross_entropy_)
 
     # Accuracy
     accuracy_ = accuracy(
-        output_placeholder_,
+        labels_,
         result_
     )
 
-    init_op_ = tf.global_variables_initializer()
+    global_init_op_ = tf.global_variables_initializer()
+    local_init_op_ = tf.local_variables_initializer()
 
     with tf.Session() as sess_:
         # initialise the variables
-        sess_.run(init_op_)
+        sess_.run(global_init_op_)
+        sess_.run(local_init_op_)
+
         total_batch_ = int(training_data_.shape[0] / batch_size_)
-        for epoch in range(epochs_):
+        for epoch_ in range(epochs_):
             avg_cost_ = 0
+            sess_.run(train_init_op_, feed_dict={
+                input_placeholder_: training_data_,
+                output_placeholder_: training_labels_
+            })
             for i in range(total_batch_):
                 progress = (i / float(total_batch_-1)) * 100
                 print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
-                batch_x_ = training_data_[i * batch_size_: (i + 1) * batch_size_]
-                batch_y_ = training_labels_[i * batch_size_: (i + 1) * batch_size_]
+
                 _, cost_ = sess_.run([optimiser_, cross_entropy_],
                                      feed_dict={
-                                         input_placeholder_: batch_x_,
-                                         output_placeholder_: batch_y_,
                                          rate_placeholder_: 0.2
                                      })
                 avg_cost_ += cost_ / total_batch_
 
+            sess_.run(test_init_op_, feed_dict={
+                input_placeholder_: test_data_,
+                output_placeholder_: test_labels_
+            })
             test_acc_ = sess_.run(accuracy_,
                                   feed_dict={
-                                      input_placeholder_: test_data_,
-                                      output_placeholder_: test_labels_,
                                       rate_placeholder_: 0
                                   })
-            print "\nEpoch:", (epoch + 1), \
+            print "\nEpoch:", (epoch_ + 1), \
                 "cost =", "{:.3f}".format(avg_cost_),\
                 "test accuracy: {:.3f}".format(test_acc_)
 
+        sess_.run(test_init_op_, feed_dict={
+            input_placeholder_: test_data_,
+            output_placeholder_: test_labels_
+        })
         print "\nTraining complete!"
         print sess_.run(accuracy_,
                         feed_dict={
-                            input_placeholder_: test_data_,
-                            output_placeholder_: test_labels_,
                             rate_placeholder_: 0
                         })
