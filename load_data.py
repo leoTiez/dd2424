@@ -1,5 +1,5 @@
-from tensorflow.contrib.learn.python.learn.datasets.mnist import extract_images, \
-    extract_labels
+from tensorflow.contrib.learn.python.learn.datasets.mnist import extract_images, extract_labels
+from tensorflow.python.keras.utils import to_categorical
 import cPickle
 import numpy as np
 from os import environ, path, listdir
@@ -21,11 +21,12 @@ def load_mnist(file_name, dtype, file_path=DATA_DIR + '/mnist/'):
     return data_dict
 
 
-def preprocess_mnist_data(mnist_data, dtype):
-    mean = np.mean(mnist_data, axis=0)
-    std = np.std(mnist_data, axis=0)
+def preprocess_mnist_data(mnist_data, mnist_labels, dtype):
+    # mean = np.mean(mnist_data, axis=0)
+    # std = np.std(mnist_data, axis=0)
 
-    return (mnist_data - mean) / (std + np.finfo(dtype).eps)
+    # return (mnist_data - mean) / (std + np.finfo(dtype).eps), to_categorical(mnist_labels, num_classes=10)
+    return mnist_data / 255., to_categorical(mnist_labels, num_classes=10)
 
 
 def load_cifar(file_name, dtype, file_path=DATA_DIR + '/cifar-10-batches-py/'):
@@ -42,20 +43,20 @@ def load_cifar(file_name, dtype, file_path=DATA_DIR + '/cifar-10-batches-py/'):
     return data_dict
 
 
-def preprocess_cifar_data(cifar_data, dtype):
+def preprocess_cifar_data(cifar_data, cifar_labels, dtype):
     mean = np.mean(cifar_data, axis=0)
     std = np.std(cifar_data, axis=0)
     batch_size = cifar_data.shape[0]
 
-    cifar_data = (cifar_data - mean) / (std - np.finfo(dtype).eps)
+    # cifar_data = (cifar_data - mean) / (std - np.finfo(dtype).eps)
 
-    R = cifar_data[:, 0:1024]
-    G = cifar_data[:, 1024:2048]
-    B = cifar_data[:, 2048:]
+    R = cifar_data[:, 0:1024] / 255.
+    G = cifar_data[:, 1024:2048] / 255.
+    B = cifar_data[:, 2048:] / 255.
 
     cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
 
-    return cifar_data
+    return cifar_data, to_categorical(cifar_labels, num_classes=10)
 
 
 def _tinynet_parse_ims(filename, label):

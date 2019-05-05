@@ -9,7 +9,7 @@
 It is recommended to use the `requirements.txt` file for the installation. Run
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt --user
 ```
 
 ### Data
