@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
     model.compile(
         optimizer=tf.train.AdagradOptimizer(learning_rate=.1),
-        loss='kullback_leibler_divergence',
+        loss='categorical_crossentropy',
         metrics=['accuracy']
     )
     #
