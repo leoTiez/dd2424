@@ -20,7 +20,7 @@ def rcl(
         std=.03,
         alpha=1e-3,
         beta=.75,
-        normalization_feature_maps=8,
+        normalization_feature_maps=4,
         name='rcl'
 ):
     conv_filter_forward_shape = [filter_shape[0], filter_shape[1], num_input_channels, num_filter]
@@ -168,7 +168,7 @@ if __name__ == '__main__':
     epochs_ = 5
     # For me, setting the *_size to more than 2000 my system ran out of memory
     # For the large scale tests it should not be an issue anymore and the test size can be increased
-    batch_size_ = 100
+    batch_size_ = 12
     test_data_size_ = 2000
     num_filter_ = 64
     buffer_size_ = 10000
@@ -180,8 +180,8 @@ if __name__ == '__main__':
         mnist_dict_['labels'],
         dtype=PRECISION_NP
     )
-    training_data_ = training_data_np_[:-test_data_size_]
-    training_labels_ = training_labels_np_[:-test_data_size_]
+    training_data_ = training_data_np_[:5000]
+    training_labels_ = training_labels_np_[:5000]
     test_data_ = training_data_np_[-test_data_size_:]
     test_labels_ = training_labels_np_[-test_data_size_:]
 
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     test_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).shuffle(buffer_size=buffer_size_).batch(batch_size=batch_size_)
+    )).batch(batch_size_)
 
     # Create Iterator
     data_iterator_ = tf.data.Iterator.from_structure(training_data_set_.output_types, training_data_set_.output_shapes)
@@ -335,7 +335,7 @@ if __name__ == '__main__':
     global_init_op_ = tf.global_variables_initializer()
     local_init_op_ = tf.local_variables_initializer()
 
-    with tf.Session() as sess_:
+    with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess_:
         #
         # writer = tf.summary.FileWriter('logs/.')
         # writer.add_graph(sess_.graph)
@@ -370,12 +370,12 @@ if __name__ == '__main__':
                 input_placeholder_: test_data_,
                 output_placeholder_: test_labels_
             })
-            test_acc_, accuracies = sess_.run([accuracy_, summaries],
+            test_acc_ = sess_.run(accuracy_,
                                   feed_dict={
                                       rate_placeholder_: 0,
                                       num_data_placeholder_: batch_size_
                                   })
-            test_writer.add_summary(accuracies)
+            #test_writer.add_summary(accuracies)
             print "\nEpoch:", (epoch_ + 1), \
                 "cost =", "{:.3f}".format(avg_cost_),\
                 "test accuracy: {:.3f}".format(test_acc_)
