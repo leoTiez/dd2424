@@ -167,29 +167,30 @@ class RCNN:
             output_shape=[None, 10],
             learning_rate=.1,
             num_filter=64,
+            batch_size=100,
+            shuffle_buffer_size=10000,
             conv_layer_filter_shape=[5, 5],
             rec_conv_layer_filter_shape=[3, 3],
             pooling_shape=[3, 3],
             pooling_stride_shape=[2, 2]
     ):
-        input_placeholder = tf.placeholder(PRECISION_TF, input_shape)
-        output_placeholder = tf.placeholder(PRECISION_TF, output_shape)
+        self.input_placeholder = tf.placeholder(PRECISION_TF, input_shape)
+        self.output_placeholder = tf.placeholder(PRECISION_TF, output_shape)
 
-        shuffle_buffer_size_placeholder = tf.placeholder(PRECISION_TF)
         # dropout probability placeholder
-        rate_placeholder = tf.placeholder(PRECISION_TF)
+        self.rate_placeholder = tf.placeholder(PRECISION_TF)
         # number of data placeholder
-        num_data_placeholder = tf.placeholder(PRECISION_TF)
+        self.num_data_placeholder = tf.placeholder(PRECISION_TF)
 
         # Create data set objects
         training_data_set = tf.data.Dataset.from_tensor_slices((
-            input_placeholder,
-            output_placeholder
-        )).shuffle(buffer_size=shuffle_buffer_size_placeholder).repeat().batch(batch_size=num_data_placeholder)
+            self.input_placeholder,
+            self.output_placeholder
+        )).shuffle(buffer_size=shuffle_buffer_size).repeat().batch(batch_size=batch_size)
         test_data_set = tf.data.Dataset.from_tensor_slices((
-            input_placeholder,
-            output_placeholder,
-        )).batch(batch_size=num_data_placeholder)
+            self.input_placeholder,
+            self.output_placeholder,
+        )).batch(batch_size=batch_size_)
 
         # Create Iterator
         data_iterator = tf.data.Iterator.from_structure(training_data_set.output_types,
@@ -220,7 +221,7 @@ class RCNN:
         rcl_layer_1 = rcl(
             input_data=pooling_1,
             num_input_channels=num_filter,
-            num_of_data=num_data_placeholder,
+            num_of_data=self.num_data_placeholder,
             filter_shape=rec_conv_layer_filter_shape,
             num_filter=num_filter,
             name='rcl_layer_1'
@@ -228,13 +229,13 @@ class RCNN:
 
         dropout_1 = tf.nn.dropout(
             rcl_layer_1,
-            rate=rate_placeholder,
+            rate=self.rate_placeholder,
             name='drop_1'
         )
 
         rcl_layer_2 = rcl(
             input_data=dropout_1,
-            num_of_data=num_data_placeholder,
+            num_of_data=self.num_data_placeholder,
             num_input_channels=num_filter,
             filter_shape=rec_conv_layer_filter_shape,
             num_filter=num_filter,
@@ -249,14 +250,14 @@ class RCNN:
 
         dropout_2 = tf.nn.dropout(
             pooling_2,
-            rate=rate_placeholder,
+            rate=self.rate_placeholder,
             name='drop_2'
         )
 
         # Recurrent convolutional layer
         rcl_layer_3 = rcl(
             input_data=dropout_2,
-            num_of_data=num_data_placeholder,
+            num_of_data=self.num_data_placeholder,
             num_input_channels=num_filter,
             filter_shape=rec_conv_layer_filter_shape,
             num_filter=num_filter,
@@ -265,13 +266,13 @@ class RCNN:
 
         dropout_3 = tf.nn.dropout(
             rcl_layer_3,
-            rate=rate_placeholder,
+            rate=self.rate_placeholder,
             name='drop_3'
         )
 
         rcl_layer_4 = rcl(
             input_data=dropout_3,
-            num_of_data=num_data_placeholder,
+            num_of_data=self.num_data_placeholder,
             num_input_channels=num_filter,
             filter_shape=rec_conv_layer_filter_shape,
             num_filter=num_filter,
@@ -306,7 +307,7 @@ class RCNN:
             result
         )
 
-        tf.summary.scalar('accuracy', accuracy)
+        tf.summary.scalar('accuracy', self.accuracy)
 
         self.summaries = tf.summary.merge_all()
         self.global_init_op = tf.global_variables_initializer()
@@ -319,11 +320,9 @@ class RCNN:
             val_data_features,
             val_data_labels,
             batch_size=100,
-            shuffle_buffer_size=10000,
             epochs=7,
             create_graph=True
     ):
-
         with tf.Session() as sess:
             if create_graph:
                 writer = tf.summary.FileWriter('logs/.')
@@ -340,8 +339,8 @@ class RCNN:
             for epoch in range(epochs):
                 avg_cost = 0
                 sess.run(self.train_init_op, feed_dict={
-                    input_placeholder: training_data_features,
-                    output_placeholder: training_data_labels
+                    self.input_placeholder: training_data_features,
+                    self.output_placeholder: training_data_labels
                 })
                 for i in range(total_batch):
                     progress = (i / float(total_batch - 1)) * 100
@@ -349,22 +348,20 @@ class RCNN:
 
                     accuracies, _, cost_ = sess.run([self.summaries, self.optimiser, self.cross_entropy],
                                                      feed_dict={
-                                                         rate_placeholder: 0.2,
-                                                         num_data_placeholder: batch_size,
-                                                         shuffle_buffer_size_placeholder: shuffle_buffer_size
+                                                         self.rate_placeholder: 0.2,
+                                                         self.num_data_placeholder: batch_size,
                                                      })
                     avg_cost += cost_ / total_batch
                     train_writer.add_summary(accuracies)
 
                 sess.run(self.test_init_op, feed_dict={
-                    input_placeholder: val_data_features,
-                    output_placeholder: val_data_labels
+                    self.input_placeholder: val_data_features,
+                    self.output_placeholder: val_data_labels
                 })
                 val_acc, accuracies = sess.run([self.accuracy, self.summaries],
                                                   feed_dict={
-                                                      rate_placeholder: 0,
-                                                      num_data_placeholder: batch_size,
-                                                      shuffle_buffer_size_placeholder: shuffle_buffer_size
+                                                      self.rate_placeholder: 0,
+                                                      self.num_data_placeholder: batch_size,
                                                   })
                 test_writer.add_summary(accuracies)
                 print "\nEpoch:", (epoch + 1), \
@@ -396,3 +393,12 @@ if __name__ == '__main__':
     training_labels_ = training_labels_np_[:-test_data_size_]
     test_data_ = training_data_np_[-test_data_size_:]
     test_labels_ = training_labels_np_[-test_data_size_:]
+
+    rcnn = RCNN(input_shape_)
+
+    rcnn.train(
+        training_data_,
+        training_labels_,
+        test_data_,
+        test_labels_
+    )
