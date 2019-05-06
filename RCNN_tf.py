@@ -160,6 +160,218 @@ def accuracy(
     return tf.metrics.accuracy(labels=labels, predictions=result)[1]
 
 
+class RCNN:
+    def __init__(
+            self,
+            input_shape,
+            output_shape=[None, 10],
+            learning_rate=.1,
+            num_filter=64,
+            conv_layer_filter_shape=[5, 5],
+            rec_conv_layer_filter_shape=[3, 3],
+            pooling_shape=[3, 3],
+            pooling_stride_shape=[2, 2]
+    ):
+        input_placeholder = tf.placeholder(PRECISION_TF, input_shape)
+        output_placeholder = tf.placeholder(PRECISION_TF, output_shape)
+
+        shuffle_buffer_size_placeholder = tf.placeholder(PRECISION_TF)
+        # dropout probability placeholder
+        rate_placeholder = tf.placeholder(PRECISION_TF)
+        # number of data placeholder
+        num_data_placeholder = tf.placeholder(PRECISION_TF)
+
+        # Create data set objects
+        training_data_set = tf.data.Dataset.from_tensor_slices((
+            input_placeholder,
+            output_placeholder
+        )).shuffle(buffer_size=shuffle_buffer_size_placeholder).repeat().batch(batch_size=num_data_placeholder)
+        test_data_set = tf.data.Dataset.from_tensor_slices((
+            input_placeholder,
+            output_placeholder,
+        )).batch(batch_size=num_data_placeholder)
+
+        # Create Iterator
+        data_iterator = tf.data.Iterator.from_structure(training_data_set.output_types,
+                                                         training_data_set.output_shapes)
+        # Initialize iterators and get input and output placeholder variables
+        self.train_init_op = data_iterator.make_initializer(training_data_set)
+        self.test_init_op = data_iterator.make_initializer(test_data_set)
+        # Defines the pipeline and creates a pointer to the next data point
+        features, labels = data_iterator.get_next()
+
+        # Net definition
+        # First convolutional layer
+        conv_layer = convolutional_layer(
+            features,
+            num_input_channels=input_shape[-1],
+            filter_shape=conv_layer_filter_shape,
+            num_filter=num_filter,
+            name='conv_layer_1'
+        )
+
+        pooling_1 = pooling_layer(
+            input_data=conv_layer,
+            pool_shape=pooling_shape,
+            stride=pooling_stride_shape
+        )
+
+        # Recurrent convolutional layers
+        rcl_layer_1 = rcl(
+            input_data=pooling_1,
+            num_input_channels=num_filter,
+            num_of_data=num_data_placeholder,
+            filter_shape=rec_conv_layer_filter_shape,
+            num_filter=num_filter,
+            name='rcl_layer_1'
+        )
+
+        dropout_1 = tf.nn.dropout(
+            rcl_layer_1,
+            rate=rate_placeholder,
+            name='drop_1'
+        )
+
+        rcl_layer_2 = rcl(
+            input_data=dropout_1,
+            num_of_data=num_data_placeholder,
+            num_input_channels=num_filter,
+            filter_shape=rec_conv_layer_filter_shape,
+            num_filter=num_filter,
+            name='rcl_layer_2'
+        )
+
+        pooling_2 = pooling_layer(
+            input_data=rcl_layer_2,
+            pool_shape=pooling_shape,
+            stride=pooling_stride_shape
+        )
+
+        dropout_2 = tf.nn.dropout(
+            pooling_2,
+            rate=rate_placeholder,
+            name='drop_2'
+        )
+
+        # Recurrent convolutional layer
+        rcl_layer_3 = rcl(
+            input_data=dropout_2,
+            num_of_data=num_data_placeholder,
+            num_input_channels=num_filter,
+            filter_shape=rec_conv_layer_filter_shape,
+            num_filter=num_filter,
+            name='rcl_layer_3'
+        )
+
+        dropout_3 = tf.nn.dropout(
+            rcl_layer_3,
+            rate=rate_placeholder,
+            name='drop_3'
+        )
+
+        rcl_layer_4 = rcl(
+            input_data=dropout_3,
+            num_of_data=num_data_placeholder,
+            num_input_channels=num_filter,
+            filter_shape=rec_conv_layer_filter_shape,
+            num_filter=num_filter,
+            name='rcl_layer_4'
+        )
+
+        # Max pooling layer
+        global_max = global_max_pooling_layer(rcl_layer_4)
+
+        # Flatten tensor for softmax layer
+        flatten = tf.reshape(global_max, [-1, global_max.shape[-1].value])
+
+        # Softmax layer
+        result, linear_trans = softmax_layer(
+            flatten,
+            global_max.shape[-1].value,
+            output_shape_[1]
+        )
+
+        # cross entropy and accuracy matrix
+        self.cross_entropy = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits_v2(logits=linear_trans, labels=labels)
+        )
+
+        tf.summary.scalar('loss', self.cross_entropy)
+
+        self.optimiser = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(self.cross_entropy)
+
+        # Accuracy
+        self.accuracy = accuracy(
+            labels,
+            result
+        )
+
+        tf.summary.scalar('accuracy', accuracy)
+
+        self.summaries = tf.summary.merge_all()
+        self.global_init_op = tf.global_variables_initializer()
+        self.local_init_op = tf.local_variables_initializer()
+
+    def train(
+            self,
+            training_data_features,
+            training_data_labels,
+            val_data_features,
+            val_data_labels,
+            batch_size=100,
+            shuffle_buffer_size=10000,
+            epochs=7,
+            create_graph=True
+    ):
+
+        with tf.Session() as sess:
+            if create_graph:
+                writer = tf.summary.FileWriter('logs/.')
+                writer.flush()
+                writer.add_graph(sess.graph)
+
+            train_writer = tf.summary.FileWriter('logs/train', sess.graph)
+            test_writer = tf.summary.FileWriter('logs/test')
+            # initialise the variables
+            sess.run(self.global_init_op)
+            sess.run(self.local_init_op)
+
+            total_batch = int(training_data_features.shape[0] / batch_size)
+            for epoch in range(epochs):
+                avg_cost = 0
+                sess.run(self.train_init_op, feed_dict={
+                    input_placeholder: training_data_features,
+                    output_placeholder: training_data_labels
+                })
+                for i in range(total_batch):
+                    progress = (i / float(total_batch - 1)) * 100
+                    print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
+
+                    accuracies, _, cost_ = sess.run([self.summaries, self.optimiser, self.cross_entropy],
+                                                     feed_dict={
+                                                         rate_placeholder: 0.2,
+                                                         num_data_placeholder: batch_size,
+                                                         shuffle_buffer_size_placeholder: shuffle_buffer_size
+                                                     })
+                    avg_cost += cost_ / total_batch
+                    train_writer.add_summary(accuracies)
+
+                sess.run(self.test_init_op, feed_dict={
+                    input_placeholder: val_data_features,
+                    output_placeholder: val_data_labels
+                })
+                val_acc, accuracies = sess.run([self.accuracy, self.summaries],
+                                                  feed_dict={
+                                                      rate_placeholder: 0,
+                                                      num_data_placeholder: batch_size,
+                                                      shuffle_buffer_size_placeholder: shuffle_buffer_size
+                                                  })
+                test_writer.add_summary(accuracies)
+                print "\nEpoch:", (epoch + 1), \
+                    "cost =", "{:.3f}".format(avg_cost), \
+                    "test accuracy: {:.3f}".format(val_acc)
+
+
 if __name__ == '__main__':
     # Setting the parameters
     input_shape_ = [None, 28, 28, 1]
@@ -184,211 +396,3 @@ if __name__ == '__main__':
     training_labels_ = training_labels_np_[:-test_data_size_]
     test_data_ = training_data_np_[-test_data_size_:]
     test_labels_ = training_labels_np_[-test_data_size_:]
-
-    # Create input and output placeholder
-    input_placeholder_ = tf.placeholder(PRECISION_TF, input_shape_)
-    output_placeholder_ = tf.placeholder(PRECISION_TF, output_shape_)
-
-    # Create data set objects
-    training_data_set_ = tf.data.Dataset.from_tensor_slices((
-        input_placeholder_,
-        output_placeholder_
-    )).shuffle(buffer_size=buffer_size_).repeat().batch(batch_size=batch_size_)
-    test_data_set_ = tf.data.Dataset.from_tensor_slices((
-        input_placeholder_,
-        output_placeholder_
-    )).shuffle(buffer_size=buffer_size_).batch(batch_size=batch_size_)
-
-    # Create Iterator
-    data_iterator_ = tf.data.Iterator.from_structure(training_data_set_.output_types, training_data_set_.output_shapes)
-    # Initialize iterators and get input and output placeholder variables
-    train_init_op_ = data_iterator_.make_initializer(training_data_set_)
-    test_init_op_ = data_iterator_.make_initializer(test_data_set_)
-    # Defines the pipeline and creates a pointer to the next data point
-    features_, labels_ = data_iterator_.get_next()
-
-    # dropout probability placeholder
-    rate_placeholder_ = tf.placeholder(PRECISION_TF)
-    # number of data placeholder
-    num_data_placeholder_ = tf.placeholder(PRECISION_TF)
-
-    # Net definition
-    # First convolutional layer
-    conv_layer_ = convolutional_layer(
-        features_,
-        num_input_channels=1,
-        filter_shape=(5, 5),
-        num_filter=num_filter_,
-        name='conv_layer_1'
-    )
-
-    # First pooling layer
-    # Size 3 and stride 2, as proposed in the paper
-    pooling_shape_1_ = (3, 3)
-    striding_shape_1_ = (2, 2)
-
-    pooling_1_ = pooling_layer(
-        input_data=conv_layer_,
-        pool_shape=pooling_shape_1_,
-        stride=striding_shape_1_
-    )
-
-    # Recurrent convolutional layers
-    rcl_layer_1_ = rcl(
-        input_data=pooling_1_,
-        num_input_channels=num_filter_,
-        num_of_data=num_data_placeholder_,
-        filter_shape=(3,3),
-        num_filter=num_filter_,
-        name='rcl_layer_1'
-    )
-
-    dropout_1_ = tf.nn.dropout(
-        rcl_layer_1_,
-        rate=rate_placeholder_,
-        name='drop_1'
-    )
-
-    rcl_layer_2_ = rcl(
-        input_data=dropout_1_,
-        num_of_data=num_data_placeholder_,
-        num_input_channels=num_filter_,
-        filter_shape=(3, 3),
-        num_filter=num_filter_,
-        name='rcl_layer_2'
-    )
-
-    # Second pooling layer
-    # Size 3 and stride 2, as proposed in the paper
-    pooling_shape_2_ = (3, 3)
-    striding_shape_2_ = (2, 2)
-
-
-    pooling_2_ = pooling_layer(
-        input_data=rcl_layer_2_,
-        pool_shape=pooling_shape_2_,
-        stride=striding_shape_2_
-    )
-
-    dropout_2_ = tf.nn.dropout(
-        pooling_2_,
-        rate=rate_placeholder_,
-        name='drop_2'
-    )
-
-    # Recurrent convolutional layer
-    rcl_layer_3_ = rcl(
-        input_data=pooling_2_,
-        num_of_data=num_data_placeholder_,
-        num_input_channels=num_filter_,
-        filter_shape=(3, 3),
-        num_filter=num_filter_,
-        name='rcl_layer_3'
-    )
-
-    dropout_3_ = tf.nn.dropout(
-        rcl_layer_3_,
-        rate=rate_placeholder_,
-        name='drop_3'
-    )
-
-    rcl_layer_4_ = rcl(
-        input_data=dropout_3_,
-        num_of_data=num_data_placeholder_,
-        num_input_channels=num_filter_,
-        filter_shape=(3, 3),
-        num_filter=num_filter_,
-        name='rcl_layer_4'
-    )
-
-    # Max pooling layer
-    global_max_ = global_max_pooling_layer(rcl_layer_4_)
-
-    # Flatten tensor for softmax layer
-    flatten_ = tf.reshape(global_max_, [-1, global_max_.shape[-1].value])
-
-    # Softmax layer
-    result_, linear_trans_ = softmax_layer(
-        flatten_,
-        global_max_.shape[-1].value,
-        output_shape_[1]
-    )
-
-    # cross entropy and accuracy matrix
-    cross_entropy_ = tf.reduce_mean(
-        tf.nn.softmax_cross_entropy_with_logits_v2(logits=linear_trans_, labels=labels_)
-    )
-
-    tf.summary.scalar('loss', cross_entropy_)
-
-    optimiser_ = tf.train.AdamOptimizer(learning_rate=learning_rate_).minimize(cross_entropy_)
-
-    # Accuracy
-    accuracy_ = accuracy(
-        labels_,
-        result_
-    )
-
-    tf.summary.scalar('accuracy', accuracy_)
-
-    summaries = tf.summary.merge_all()
-    global_init_op_ = tf.global_variables_initializer()
-    local_init_op_ = tf.local_variables_initializer()
-
-    with tf.Session() as sess_:
-        #
-        # writer = tf.summary.FileWriter('logs/.')
-        # writer.add_graph(sess_.graph)
-        # writer.flush()
-
-        train_writer = tf.summary.FileWriter('logs/train', sess_.graph)
-        test_writer = tf.summary.FileWriter('logs/test')
-        # initialise the variables
-        sess_.run(global_init_op_)
-        sess_.run(local_init_op_)
-
-        total_batch_ = int(training_data_.shape[0] / batch_size_)
-        for epoch_ in range(epochs_):
-            avg_cost_ = 0
-            sess_.run(train_init_op_, feed_dict={
-                input_placeholder_: training_data_,
-                output_placeholder_: training_labels_
-            })
-            for i in range(total_batch_):
-                progress = (i / float(total_batch_-1)) * 100
-                print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
-
-                accuracies, _, cost_ = sess_.run([summaries, optimiser_, cross_entropy_],
-                                     feed_dict={
-                                         rate_placeholder_: 0.2,
-                                         num_data_placeholder_: batch_size_
-                                     })
-                avg_cost_ += cost_ / total_batch_
-                train_writer.add_summary(accuracies)
-
-            sess_.run(test_init_op_, feed_dict={
-                input_placeholder_: test_data_,
-                output_placeholder_: test_labels_
-            })
-            test_acc_, accuracies = sess_.run([accuracy_, summaries],
-                                  feed_dict={
-                                      rate_placeholder_: 0,
-                                      num_data_placeholder_: batch_size_
-                                  })
-            test_writer.add_summary(accuracies)
-            print "\nEpoch:", (epoch_ + 1), \
-                "cost =", "{:.3f}".format(avg_cost_),\
-                "test accuracy: {:.3f}".format(test_acc_)
-
-        sess_.run(test_init_op_, feed_dict={
-            input_placeholder_: test_data_,
-            output_placeholder_: test_labels_,
-        })
-        print "\nTraining complete!"
-        print sess_.run(accuracy_,
-                        feed_dict={
-                            rate_placeholder_: 0,
-                            num_data_placeholder_: batch_size_
-                        })
-        test_writer.close()
-        train_writer.close()
