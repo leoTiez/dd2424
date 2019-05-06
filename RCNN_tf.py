@@ -183,7 +183,7 @@ if __name__ == '__main__':
     training_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).repeat().batch(batch_size=batch_size_).shuffle(buffer_size=buffer_size_)
+    )).shuffle(buffer_size=buffer_size_).batch(batch_size=batch_size_).repeat()
     test_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
@@ -194,6 +194,7 @@ if __name__ == '__main__':
     # Initialize iterators and get input and output placeholder variables
     train_init_op_ = data_iterator_.make_initializer(training_data_set_)
     test_init_op_ = data_iterator_.make_initializer(test_data_set_)
+    # Defines the pipeline and creates a pointer to the next data point
     features_, labels_ = data_iterator_.get_next()
 
     # dropout probability placeholder
