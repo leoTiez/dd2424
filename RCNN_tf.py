@@ -183,7 +183,7 @@ if __name__ == '__main__':
     training_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).shuffle(buffer_size=buffer_size_).batch(batch_size=batch_size_).repeat()
+    )).shuffle(buffer_size=buffer_size_).repeat().batch(batch_size=batch_size_)
     test_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
@@ -303,6 +303,8 @@ if __name__ == '__main__':
         tf.nn.softmax_cross_entropy_with_logits_v2(logits=linear_trans_, labels=labels_)
     )
 
+    tf.summary.scalar('loss', cross_entropy_)
+
     optimiser_ = tf.train.AdamOptimizer(learning_rate=learning_rate_).minimize(cross_entropy_)
 
     # Accuracy
@@ -311,10 +313,20 @@ if __name__ == '__main__':
         result_
     )
 
+    tf.summary.scalar('accuracy', accuracy_)
+
+    summaries = tf.summary.merge_all()
     global_init_op_ = tf.global_variables_initializer()
     local_init_op_ = tf.local_variables_initializer()
 
     with tf.Session() as sess_:
+        #
+        # writer = tf.summary.FileWriter('logs/.')
+        # writer.add_graph(sess_.graph)
+        # writer.flush()
+
+        train_writer = tf.summary.FileWriter('logs/train', sess_.graph)
+        test_writer = tf.summary.FileWriter('logs/test')
         # initialise the variables
         sess_.run(global_init_op_)
         sess_.run(local_init_op_)
@@ -330,20 +342,22 @@ if __name__ == '__main__':
                 progress = (i / float(total_batch_-1)) * 100
                 print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
-                _, cost_ = sess_.run([optimiser_, cross_entropy_],
+                accuracies, _, cost_ = sess_.run([summaries, optimiser_, cross_entropy_],
                                      feed_dict={
                                          rate_placeholder_: 0.2
                                      })
                 avg_cost_ += cost_ / total_batch_
+                train_writer.add_summary(accuracies)
 
             sess_.run(test_init_op_, feed_dict={
                 input_placeholder_: test_data_,
                 output_placeholder_: test_labels_
             })
-            test_acc_ = sess_.run(accuracy_,
+            test_acc_, accuracies = sess_.run([accuracy_, summaries],
                                   feed_dict={
                                       rate_placeholder_: 0
                                   })
+            test_writer.add_summary(accuracies)
             print "\nEpoch:", (epoch_ + 1), \
                 "cost =", "{:.3f}".format(avg_cost_),\
                 "test accuracy: {:.3f}".format(test_acc_)
@@ -357,3 +371,5 @@ if __name__ == '__main__':
                         feed_dict={
                             rate_placeholder_: 0
                         })
+        test_writer.close()
+        train_writer.close()
