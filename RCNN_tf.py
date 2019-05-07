@@ -194,7 +194,7 @@ if __name__ == '__main__':
     test_data_set_ = tf.data.Dataset.from_tensor_slices((
         input_placeholder_,
         output_placeholder_
-    )).batch(test_data_size_).prefetch(test_data_size_)
+    )).batch(test_data_size_)
 
     # Create Iterator
     data_iterator_ = tf.data.Iterator.from_structure(training_data_set_.output_types, training_data_set_.output_shapes)
@@ -359,14 +359,14 @@ if __name__ == '__main__':
                 avg_cost_ += cost_ / total_batch_
                 train_writer.add_summary(summary_accuracy_)
 
-            sess_.run(train_init_op_, feed_dict={
-                input_placeholder_: training_data_,
-                output_placeholder_: training_labels_
+            sess_.run(test_init_op_, feed_dict={
+                input_placeholder_: test_data_,
+                output_placeholder_: test_labels_
             })
             test_acc_, summary_test_accuracy_ = sess_.run([accuracy_, summaries_],
                                                           feed_dict={
                                                               rate_placeholder_: 0,
-                                                              num_data_placeholder_: batch_size_
+                                                              num_data_placeholder_: test_data_size_
                                                           })
             test_writer.add_summary(summary_test_accuracy_)
             print "\nEpoch:", (epoch_ + 1), \
@@ -382,7 +382,7 @@ if __name__ == '__main__':
         print sess_.run(accuracy_,
                         feed_dict={
                             rate_placeholder_: 0,
-                            num_data_placeholder_: batch_size_
+                            num_data_placeholder_: test_data_size_
                         })
         test_writer.close()
         train_writer.close()
