@@ -1,14 +1,97 @@
-from tensorflow.contrib.learn.python.learn.datasets.mnist import extract_images, extract_labels
+#!/usr/bin/python2
+
+"""load_data.py: Load and preprocess datasets"""
+
+__author__ = "Adrian Chmielewski-Anders, Leo Zeitler & Bas Straathof"
+
+from tensorflow.contrib.learn.python.learn.datasets.mnist import \
+        extract_images, extract_labels
 from tensorflow.python.keras.utils import to_categorical
 import cPickle
 import numpy as np
 from os import environ, path, listdir
 import tensorflow as tf
 import csv
+from PIL import Image
 
 DATA_DIR = './data'
 if 'DATA_DIRECTORY' in environ:
     DATA_DIR = environ['DATA_DIRECTORY']
+
+
+def data_loader(dataset, file_name, dtype):
+    if dataset == "mnist":
+        with open(DATA_DIR + '/mnist/' + 'mnist-' +
+                file_name + '-images.gz', 'rb') as fo:
+            data = np.asarray(extract_images(fo), dtype=dtype) / 255.
+
+        with open(DATA_DIR + '/mnist/' + 'mnist-' + file_name +
+                '-labels.gz', 'rb') as fo:
+            labels = to_categorical(
+                np.asarray(extract_labels(fo), dtype=dtype),
+                num_classes=10
+            )
+
+    elif dataset == "cifar10":
+        with open(str(DATA_DIR + '/cifar-10-batches-py/' + file_name), 'rb') as fo:
+            data_dict = cPickle.load(fo)
+
+        data = np.asarray(data_dict['data'], dtype=dtype)
+
+        batch_size = data.shape[0]
+        R = data[:, 0:1024] / 255.
+        G = data[:, 1024:2048] / 255.
+        B = data[:, 2048:] / 255.
+
+        data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
+
+        labels = to_categorical(np.asarray(data_dict['labels'], dtype=dtype),
+                num_classes=10)
+
+    elif dataset == "cifar100":
+        with open(str(DATA_DIR + '/cifar-100-python/' + file_name), 'rb') as fo:
+            data_dict = cPickle.load(fo)
+
+        data = np.asarray(data_dict['data'], dtype=dtype)
+
+        batch_size = data.shape[0]
+        R = data[:, 0:1024] / 255.
+        G = data[:, 1024:2048] / 255.
+        B = data[:, 2048:] / 255.
+
+        data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
+
+        labels = to_categorical(np.asarray(data_dict['fine_labels'], dtype=dtype),
+                num_classes=100)
+
+    elif dataset == "tinynet":
+        data_dict = {"data": [], "labels": []}
+        wnids = map(lambda x: x.strip(),
+                open(DATA_DIR + '/tiny-imagenet-200/wnids.txt').readlines())
+
+        for i in xrange(len(wnids)):
+            wnid = wnids[i]
+            for j in xrange(500):
+                path = DATA_DIR + '/tiny-imagenet-200/' + \
+                        "train/{0}/images/{0}_{1}.JPEG".format(wnid, j)
+                image = np.asarray(Image.open(path).convert('RGB')
+                        ).transpose(2, 0, 1) / 255.
+
+                data_dict["data"].append(image)
+                data_dict["labels"].append(i)
+
+        data = np.asarray(data_dict['data'], dtype=dtype)
+        labels = to_categorical(
+            np.asarray(data_dict['labels'],
+            dtype=dtype),
+            num_classes=200
+        )
+
+    return data, labels
+
+################################################################################
+######################## OLDER CODE BELOW FOR REFERENCE ########################
+################################################################################
 
 
 def load_mnist(file_name, dtype, file_path=DATA_DIR + '/mnist/'):
@@ -22,10 +105,6 @@ def load_mnist(file_name, dtype, file_path=DATA_DIR + '/mnist/'):
 
 
 def preprocess_mnist_data(mnist_data, mnist_labels, dtype):
-    # mean = np.mean(mnist_data, axis=0)
-    # std = np.std(mnist_data, axis=0)
-
-    # return (mnist_data - mean) / (std + np.finfo(dtype).eps), to_categorical(mnist_labels, num_classes=10)
     return mnist_data / 255., to_categorical(mnist_labels, num_classes=10)
 
 
@@ -38,17 +117,18 @@ def load_cifar(file_name, dtype, file_path=DATA_DIR + '/cifar-10-batches-py/'):
     """
     with open(str(file_path + file_name), 'rb') as fo:
         data_dict = cPickle.load(fo)
+
+    #print(data_dict.keys())
     data_dict['data'] = np.asarray(data_dict['data'], dtype=dtype)
-    data_dict['labels'] = np.asarray(data_dict['labels'], dtype=dtype)
+    data_dict['labels'] = np.asarray(data_dict['fine_labels'], dtype=dtype)
+
+    #print(np.unique(data_dict['labels']))
+
     return data_dict
 
 
 def preprocess_cifar_data(cifar_data, cifar_labels, dtype):
-    mean = np.mean(cifar_data, axis=0)
-    std = np.std(cifar_data, axis=0)
     batch_size = cifar_data.shape[0]
-
-    # cifar_data = (cifar_data - mean) / (std - np.finfo(dtype).eps)
 
     R = cifar_data[:, 0:1024] / 255.
     G = cifar_data[:, 1024:2048] / 255.
@@ -56,7 +136,7 @@ def preprocess_cifar_data(cifar_data, cifar_labels, dtype):
 
     cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
 
-    return cifar_data, to_categorical(cifar_labels, num_classes=10)
+    return cifar_data, to_categorical(cifar_labels, num_classes=100)
 
 
 def _tinynet_parse_ims(filename, label):
@@ -82,7 +162,7 @@ def _tinynet_build_val_map(val_file, id_map):
     return val_map
 
 
-TINYNET_DIR = '/tinynet/'
+TINYNET_DIR = '/tiny-imagenet-200/'
 
 
 def load_tinynet_train(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
@@ -101,6 +181,7 @@ def load_tinynet_train(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
     labels = tf.constant(im_labels)
 
     dataset = tf.data.Dataset.from_tensor_slices((fnames, labels))
+
     return dataset.map(_tinynet_parse_ims)
 
 
@@ -112,6 +193,7 @@ def load_tinynet_test(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
 
     fpaths = []
     ids = []
+
     for f in val_map:
         fpaths.append(path.join(file_path, 'val/images', f))
         ids.append(val_map[f])
@@ -121,3 +203,4 @@ def load_tinynet_test(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
     dataset = tf.data.Dataset.from_tensor_slices((vpaths, vlabels))
 
     return dataset.map(_tinynet_parse_ims)
+
