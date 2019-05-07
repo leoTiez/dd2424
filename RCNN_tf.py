@@ -1,3 +1,14 @@
+#!/usr/bin/python2
+
+"""RCNN_tf.py: Implementation of the Recurrent Convolutional Neural Network
+as proposed in "Recurrent Convolutional Neural Network for Object Recognition"
+by Ming Liang and Xiaolin Hu (2015).
+
+A project for the 2019 DD2424 Deep Learning in Data Science course at KTH
+Royal Institute of Technology"""
+
+__author__ = "Adrian Chmielewski-Anders, Leo Zeitler & Bas Straathof"
+
 import sys
 import tensorflow as tf
 import numpy as np
@@ -344,6 +355,9 @@ class RCNN:
         self.global_init_op = tf.global_variables_initializer()
         self.local_init_op = tf.local_variables_initializer()
 
+
+
+
     def train(
             self,
             training_data_features,
@@ -352,7 +366,8 @@ class RCNN:
             val_data_labels,
             batch_size=100,
             epochs=7,
-            create_graph=True
+            create_graph=True,
+            print_variable_names=True
     ):
         with tf.Session() as sess:
             if create_graph:
@@ -362,9 +377,26 @@ class RCNN:
 
             train_writer = tf.summary.FileWriter('logs/train', sess.graph)
             test_writer = tf.summary.FileWriter('logs/test')
+
             # initialise the variables
             sess.run(self.global_init_op)
             sess.run(self.local_init_op)
+
+            if print_variable_names:
+                print "\nThe network contains the following trainable parameters:"
+                variables_names = [v.name for v in tf.trainable_variables()]
+                values = sess.run(variables_names)
+                total_parameters = 0
+                for k, v in zip(variables_names, values):
+                    print "Variable: " + k[:-2] + ". Shape: " + str(v.shape)
+
+                    variable_parameters = 1
+                    for dim in v.shape:
+                        variable_parameters *= dim
+
+                    total_parameters += variable_parameters
+
+                print "Total number of trainable parameters:", total_parameters, "\n"
 
             total_batch = int(training_data_features.shape[0] / batch_size)
             for epoch in range(epochs):
