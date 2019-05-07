@@ -1,4 +1,3 @@
-
 import sys
 import tensorflow as tf
 import numpy as np
@@ -21,10 +20,9 @@ def rcl(
         std=.03,
         alpha=1e-3,
         beta=.75,
-        normalization_feature_maps=4,
+        normalization_feature_maps=8,
         name='rcl'
 ):
-
     conv_filter_forward_shape = [filter_shape[0], filter_shape[1], num_input_channels, num_filter]
     conv_filter_recurrent_shape = [filter_shape[0], filter_shape[1], num_filter, num_filter]
     recurrent_cells_shape = [
@@ -57,6 +55,31 @@ def rcl(
 
     forward_output = tf.nn.conv2d(input_data, forward_weights, [1, 1, 1, 1], padding='SAME')
 
+    def loop_body(x, recurrent_states, output):
+        recurrent_output = tf.nn.conv2d(recurrent_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
+
+        output = tf.add(forward_output, recurrent_output)
+        output += bias
+
+        recurrent_states = tf.nn.local_response_normalization(
+            tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+            depth_radius=normalization_feature_maps,
+            bias=1,
+            alpha=alpha,
+            beta=beta,
+            name=name + '_lrn'
+        )
+        x += 1
+        return x, recurrent_states, output
+
+    results = tf.while_loop(
+        lambda x, recurrent_states, output: x < depth,
+        loop_body,
+        [0, cell_states, output],
+    )
+
+    return results[2]
+
     # Use this loop instead of the tensorflow while loop since it causes trouble running it on the gpu
     # When it is used without the optimiser it is assumed to be never executed, and hence, a dead end
     for _ in range(depth):
@@ -77,6 +100,7 @@ def rcl(
     return output
 
 
+
 def convolutional_layer(
         input_data,
         filter_shape,
@@ -87,7 +111,6 @@ def convolutional_layer(
         padding='same',
         name='conv'
 ):
-
     conv_filter_shape = [filter_shape[0], filter_shape[1], num_input_channels, num_filter]
     strides = [1, stride[0], stride[1], 1]
 
@@ -177,17 +200,17 @@ class RCNN:
         # dropout probability placeholder
         self.rate_placeholder = tf.placeholder(PRECISION_TF)
         # number of data placeholder
-        self.num_data_placeholder = tf.placeholder(PRECISION_TF)
+        self.num_data_placeholder = tf.placeholder(tf.int64)
 
         # Create data set objects
         training_data_set = tf.data.Dataset.from_tensor_slices((
             self.input_placeholder,
             self.output_placeholder
-        )).shuffle(buffer_size=shuffle_buffer_size).repeat().batch(batch_size=batch_size)
+        )).shuffle(buffer_size=shuffle_buffer_size).repeat().batch(batch_size=self.num_data_placeholder)
         test_data_set = tf.data.Dataset.from_tensor_slices((
             self.input_placeholder,
             self.output_placeholder,
-        )).batch(batch_size=batch_size)
+        )).batch(batch_size=self.num_data_placeholder)
 
         # Create Iterator
         data_iterator = tf.data.Iterator.from_structure(training_data_set.output_types,
@@ -336,7 +359,8 @@ class RCNN:
                 avg_cost = 0
                 sess.run(self.train_init_op, feed_dict={
                     self.input_placeholder: training_data_features,
-                    self.output_placeholder: training_data_labels
+                    self.output_placeholder: training_data_labels,
+                    self.num_data_placeholder: batch_size
                 })
                 for i in range(total_batch):
                     progress = (i / float(total_batch - 1)) * 100
@@ -352,12 +376,14 @@ class RCNN:
 
                 sess.run(self.test_init_op, feed_dict={
                     self.input_placeholder: val_data_features,
-                    self.output_placeholder: val_data_labels
+                    self.output_placeholder: val_data_labels,
+                    self.num_data_placeholder: val_data_features.shape[0]
                 })
                 val_acc, accuracies = sess.run([self.accuracy, self.summaries],
                                                feed_dict={
                                                    self.rate_placeholder: 0,
                                                    self.num_data_placeholder: batch_size,
+                                                   self.num_data_placeholder: val_data_features.shape[0]
                                                })
                 test_writer.add_summary(accuracies)
                 print "\nEpoch:", (epoch + 1), \
