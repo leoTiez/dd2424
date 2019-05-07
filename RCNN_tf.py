@@ -24,7 +24,7 @@ def rcl(
         normalization_feature_maps=7,
         name='rcl'
 ):
-    if "GPU" in device_name.upper() and normalization_feature_maps not in range(1, 7):
+    if "GPU" in device_name.upper() and normalization_feature_maps not in range(1, 8):
         raise ValueError("Normalization feature maps must be set to a value between 1 and 7 when running in GPU mode")
 
     conv_filter_forward_shape = [filter_shape[0], filter_shape[1], num_input_channels, num_filter]
