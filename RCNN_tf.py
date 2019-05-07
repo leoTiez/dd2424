@@ -408,7 +408,7 @@ if __name__ == '__main__':
     # gpu or cpu
     device_name_ = sys.argv[1]
 
-    if device_name_.upper() == "CPU" or device_name is None:
+    if device_name_.upper() == "CPU" or device_name_ is None:
         device_name_ = "/cpu:0"
     elif device_name_.upper() == "GPU":
         device_name_ = "/gpu:0"
