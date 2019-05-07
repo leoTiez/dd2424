@@ -57,13 +57,15 @@ def rcl(
 
     forward_output = tf.nn.conv2d(input_data, forward_weights, [1, 1, 1, 1], padding='SAME')
 
-    def loop_body(x, recurrent_states, output):
-        recurrent_output = tf.nn.conv2d(recurrent_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
+    # TODO Test for gpu computations. causing dead ends?
+    output = None
+    for _ in range(depth):
+        recurrent_output = tf.nn.conv2d(cell_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
 
         output = tf.add(forward_output, recurrent_output)
         output += bias
 
-        recurrent_states = tf.nn.local_response_normalization(
+        cell_states = tf.nn.local_response_normalization(
             tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
             depth_radius=normalization_feature_maps,
             bias=1,
@@ -71,16 +73,8 @@ def rcl(
             beta=beta,
             name=name + '_lrn'
         )
-        x += 1
-        return x, recurrent_states, output
 
-    results = tf.while_loop(
-        lambda x, recurrent_states, output: x < depth,
-        loop_body,
-        [0, cell_states, output_init],
-    )
-
-    return results[2]
+    return output
 
 
 def convolutional_layer(
@@ -353,8 +347,8 @@ if __name__ == '__main__':
 
         total_batch_ = int(training_data_.shape[0] / batch_size_)
         for epoch_ in range(epochs_):
-           
-        
+
+
                 avg_cost_ = 0
                 sess_.run(train_init_op_, feed_dict={
                     input_placeholder_: training_data_,
@@ -365,27 +359,29 @@ if __name__ == '__main__':
                     print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
                     # accuracies, _, cost_ = sess_.run([summaries, optimiser_, cross_entropy_],
-                    _, cost_ = sess_.run([optimiser_, cross_entropy_],
+                    # TODO test, remove this line
+                    cost_ = sess_.run([cross_entropy_],
                                          feed_dict={
                                              rate_placeholder_: 0.2,
                                              num_data_placeholder_: batch_size_
                                              })
                     avg_cost_ += cost_ / total_batch_
                     # train_writer.add_summary(accuracies)
-       
-                sess_.run(train_init_op_, feed_dict={
-                    input_placeholder_: training_data_,
-                    output_placeholder_:training_labels_
-                })
-                test_acc_ = sess_.run(accuracy_,
-                                      feed_dict={
-                                          rate_placeholder_: 0,
-                                          num_data_placeholder_: batch_size_
-                                          })
+
+                # TODO Test comment back in
+                # sess_.run(train_init_op_, feed_dict={
+                #     input_placeholder_: training_data_,
+                #     output_placeholder_:training_labels_
+                # })
+                # test_acc_ = sess_.run(accuracy_,
+                #                       feed_dict={
+                #                           rate_placeholder_: 0,
+                #                           num_data_placeholder_: batch_size_
+                #                           })
             #test_writer.add_summary(accuracies)
-                print "\nEpoch:", (epoch_ + 1), \
-                    "cost =", "{:.3f}".format(avg_cost_),\
-                    "test accuracy: {:.3f}".format(test_acc_)
+                # print "\nEpoch:", (epoch_ + 1), \
+                #     "cost =", "{:.3f}".format(avg_cost_),\
+                #     "test accuracy: {:.3f}".format(test_acc_)
 
         #sess_.run(test_init_op_, feed_dict={
         #    input_placeholder_: test_data_,
