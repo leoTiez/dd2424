@@ -180,17 +180,17 @@ class RCNN:
         # dropout probability placeholder
         self.rate_placeholder = tf.placeholder(PRECISION_TF)
         # number of data placeholder
-        self.num_data_placeholder = tf.placeholder(PRECISION_TF)
+        self.num_data_placeholder = tf.placeholder(tf.int64)
 
         # Create data set objects
         training_data_set = tf.data.Dataset.from_tensor_slices((
             self.input_placeholder,
             self.output_placeholder
-        )).shuffle(buffer_size=shuffle_buffer_size).repeat().batch(batch_size=batch_size)
+        )).shuffle(buffer_size=shuffle_buffer_size).repeat().batch(batch_size=self.num_data_placeholder)
         test_data_set = tf.data.Dataset.from_tensor_slices((
             self.input_placeholder,
             self.output_placeholder,
-        )).batch(batch_size=batch_size_)
+        )).batch(batch_size=self.num_data_placeholder)
 
         # Create Iterator
         data_iterator = tf.data.Iterator.from_structure(training_data_set.output_types,
@@ -340,7 +340,8 @@ class RCNN:
                 avg_cost = 0
                 sess.run(self.train_init_op, feed_dict={
                     self.input_placeholder: training_data_features,
-                    self.output_placeholder: training_data_labels
+                    self.output_placeholder: training_data_labels,
+                    self.num_data_placeholder: batch_size
                 })
                 for i in range(total_batch):
                     progress = (i / float(total_batch - 1)) * 100
@@ -356,12 +357,14 @@ class RCNN:
 
                 sess.run(self.test_init_op, feed_dict={
                     self.input_placeholder: val_data_features,
-                    self.output_placeholder: val_data_labels
+                    self.output_placeholder: val_data_labels,
+                    self.num_data_placeholder: val_data_features.shape[0]
+
                 })
                 val_acc, accuracies = sess.run([self.accuracy, self.summaries],
                                                   feed_dict={
                                                       self.rate_placeholder: 0,
-                                                      self.num_data_placeholder: batch_size,
+                                                      self.num_data_placeholder: val_data_features.shape[0]
                                                   })
                 test_writer.add_summary(accuracies)
                 print "\nEpoch:", (epoch + 1), \
@@ -389,8 +392,8 @@ if __name__ == '__main__':
         mnist_dict_['labels'],
         dtype=PRECISION_NP
     )
-    training_data_ = training_data_np_[:-test_data_size_]
-    training_labels_ = training_labels_np_[:-test_data_size_]
+    training_data_ = training_data_np_[:1000]
+    training_labels_ = training_labels_np_[:1000]
     test_data_ = training_data_np_[-test_data_size_:]
     test_labels_ = training_labels_np_[-test_data_size_:]
 
