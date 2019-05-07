@@ -327,7 +327,7 @@ if __name__ == '__main__':
 
     tf.summary.scalar('loss', cross_entropy_)
     tf.summary.scalar('accuracy', accuracy_)
-    summaries = tf.summary.merge_all()
+    summaries_ = tf.summary.merge_all()
 
     global_init_op_ = tf.global_variables_initializer()
     local_init_op_ = tf.local_variables_initializer()
@@ -351,24 +351,24 @@ if __name__ == '__main__':
                 progress = (i / float(total_batch_-1)) * 100
                 print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
-                accuracies, _, cost_ = sess_.run([summaries, optimiser_, cross_entropy_],
-                                                 feed_dict={
-                                                     rate_placeholder_: 0.2,
-                                                     num_data_placeholder_: batch_size_
-                                                 })
+                summary_accuracy_, _, cost_ = sess_.run([summaries_, optimiser_, cross_entropy_],
+                                                        feed_dict={
+                                                            rate_placeholder_: 0.2,
+                                                            num_data_placeholder_: batch_size_
+                                                        })
                 avg_cost_ += cost_ / total_batch_
-                train_writer.add_summary(accuracies)
+                train_writer.add_summary(summary_accuracy_)
 
             sess_.run(train_init_op_, feed_dict={
                 input_placeholder_: training_data_,
                 output_placeholder_: training_labels_
             })
-            test_acc_, = sess_.run([accuracy_, summaries],
-                                   feed_dict={
-                                       rate_placeholder_: 0,
-                                       num_data_placeholder_: batch_size_
-                                   })
-            test_writer.add_summary(accuracies)
+            test_acc_, summary_test_accuracy_ = sess_.run([accuracy_, summaries_],
+                                                          feed_dict={
+                                                              rate_placeholder_: 0,
+                                                              num_data_placeholder_: batch_size_
+                                                          })
+            test_writer.add_summary(summary_test_accuracy_)
             print "\nEpoch:", (epoch_ + 1), \
                 "cost =", "{:.3f}".format(avg_cost_),\
                 "test accuracy: {:.3f}".format(test_acc_)
