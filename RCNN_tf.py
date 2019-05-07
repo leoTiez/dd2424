@@ -182,7 +182,8 @@ def accuracy(
         labels,
         result
 ):
-    return tf.metrics.accuracy(labels=labels, predictions=result)[1]
+    correct_prediction = tf.equal(tf.argmax(labels, 1), tf.argmax(result, 1))
+    return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 
 class RCNN:
@@ -393,7 +394,6 @@ class RCNN:
                 val_acc, accuracies = sess.run([self.accuracy, self.summaries],
                                                feed_dict={
                                                    self.rate_placeholder: 0,
-                                                   self.num_data_placeholder: batch_size,
                                                    self.num_data_placeholder: val_data_features.shape[0]
                                                })
                 test_writer.add_summary(accuracies)
