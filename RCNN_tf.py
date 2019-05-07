@@ -182,9 +182,8 @@ def accuracy(
         labels,
         result
 ):
-    # correct_prediction = tf.equal(tf.argmax(labels, 1), tf.argmax(result, 1))
-    # return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    return tf.metrics.accuracy(labels=labels, predictions=result)[1]
+    correct_prediction = tf.equal(tf.argmax(labels, 1), tf.argmax(result, 1))
+    return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
 
 class RCNN:
@@ -421,7 +420,7 @@ if __name__ == '__main__':
     # Setting the parameters
     input_shape_ = [None, 28, 28, 1]
     output_shape_ = [None, 10]
-    learning_rate_ = .1
+    learning_rate_ = .01
     epochs_ = 5
     # For me, setting the *_size to more than 2000 my system ran out of memory
     # For the large scale tests it should not be an issue anymore and the test size can be increased
@@ -444,6 +443,7 @@ if __name__ == '__main__':
 
     rcnn = RCNN(
         input_shape_,
+        learning_rate=learning_rate_,
         device_name=device_name_
     )
 
@@ -451,5 +451,6 @@ if __name__ == '__main__':
         training_data_,
         training_labels_,
         test_data_,
-        test_labels_
+        test_labels_,
+        epochs=epochs_
     )
