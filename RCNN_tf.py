@@ -35,7 +35,7 @@ def rcl(
     ]
 
     cell_states = tf.fill(dims=recurrent_cells_shape, value=0.0)
-    output_init = tf.fill(dims=recurrent_cells_shape, value=0.0)
+    output = tf.fill(dims=recurrent_cells_shape, value=0.0)
 
     forward_weights = tf.Variable(
         tf.truncated_normal(conv_filter_forward_shape, stddev=std, dtype=PRECISION_TF),
@@ -57,8 +57,8 @@ def rcl(
 
     forward_output = tf.nn.conv2d(input_data, forward_weights, [1, 1, 1, 1], padding='SAME')
 
-    # TODO Test for gpu computations. causing dead ends?
-    output = None
+    # Use this loop instead of the tensorflow while loop since it causes trouble running it on the gpu
+    # When it is used without the optimiser it is assumed to be never executed, and hence, a dead end
     for _ in range(depth):
         recurrent_output = tf.nn.conv2d(cell_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
 
@@ -317,8 +317,6 @@ if __name__ == '__main__':
                 tf.nn.softmax_cross_entropy_with_logits_v2(logits=linear_trans_, labels=labels_)
         )
 
-        # tf.summary.scalar('loss', cross_entropy_)
-
         optimiser_ = tf.train.AdamOptimizer(learning_rate=learning_rate_).minimize(cross_entropy_)
 
         # Accuracy
@@ -327,71 +325,64 @@ if __name__ == '__main__':
             result_
         )
 
-    # tf.summary.scalar('accuracy', accuracy_)
+    tf.summary.scalar('loss', cross_entropy_)
+    tf.summary.scalar('accuracy', accuracy_)
+    summaries = tf.summary.merge_all()
 
-    # summaries = tf.summary.merge_all()
     global_init_op_ = tf.global_variables_initializer()
     local_init_op_ = tf.local_variables_initializer()
 
     with tf.Session(config=tf.ConfigProto(allow_soft_placement=True)) as sess_:
-        #
-        # writer = tf.summary.FileWriter('logs/.')
-        # writer.add_graph(sess_.graph)
-        # writer.flush()
+        train_writer = tf.summary.FileWriter('logs/train', sess_.graph)
+        test_writer = tf.summary.FileWriter('logs/test')
 
-        # train_writer = tf.summary.FileWriter('logs/train', sess_.graph)
-        # test_writer = tf.summary.FileWriter('logs/test')
         # initialise the variables
         sess_.run(global_init_op_)
         sess_.run(local_init_op_)
 
         total_batch_ = int(training_data_.shape[0] / batch_size_)
         for epoch_ in range(epochs_):
+            avg_cost_ = 0
+            sess_.run(train_init_op_, feed_dict={
+                input_placeholder_: training_data_,
+                output_placeholder_: training_labels_
+            })
+            for i in range(total_batch_):
+                progress = (i / float(total_batch_-1)) * 100
+                print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
+                accuracies, _, cost_ = sess_.run([summaries, optimiser_, cross_entropy_],
+                                                 feed_dict={
+                                                     rate_placeholder_: 0.2,
+                                                     num_data_placeholder_: batch_size_
+                                                 })
+                avg_cost_ += cost_ / total_batch_
+                train_writer.add_summary(accuracies)
 
-                avg_cost_ = 0
-                sess_.run(train_init_op_, feed_dict={
-                    input_placeholder_: training_data_,
-                    output_placeholder_: training_labels_
-                })
-                for i in range(total_batch_):
-                    progress = (i / float(total_batch_-1)) * 100
-                    print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
+            sess_.run(train_init_op_, feed_dict={
+                input_placeholder_: training_data_,
+                output_placeholder_: training_labels_
+            })
+            test_acc_, = sess_.run([accuracy_, summaries],
+                                   feed_dict={
+                                       rate_placeholder_: 0,
+                                       num_data_placeholder_: batch_size_
+                                   })
+            test_writer.add_summary(accuracies)
+            print "\nEpoch:", (epoch_ + 1), \
+                "cost =", "{:.3f}".format(avg_cost_),\
+                "test accuracy: {:.3f}".format(test_acc_)
 
-                    # accuracies, _, cost_ = sess_.run([summaries, optimiser_, cross_entropy_],
-                    # TODO test, remove this line
-                    cost_ = sess_.run([cross_entropy_],
-                                         feed_dict={
-                                             rate_placeholder_: 0.2,
-                                             num_data_placeholder_: batch_size_
-                                             })
-                    avg_cost_ += cost_ / total_batch_
-                    # train_writer.add_summary(accuracies)
+        print "\nTraining complete!"
 
-                # TODO Test comment back in
-                # sess_.run(train_init_op_, feed_dict={
-                #     input_placeholder_: training_data_,
-                #     output_placeholder_:training_labels_
-                # })
-                # test_acc_ = sess_.run(accuracy_,
-                #                       feed_dict={
-                #                           rate_placeholder_: 0,
-                #                           num_data_placeholder_: batch_size_
-                #                           })
-            #test_writer.add_summary(accuracies)
-                # print "\nEpoch:", (epoch_ + 1), \
-                #     "cost =", "{:.3f}".format(avg_cost_),\
-                #     "test accuracy: {:.3f}".format(test_acc_)
-
-        #sess_.run(test_init_op_, feed_dict={
-        #    input_placeholder_: test_data_,
-        #    output_placeholder_: test_labels_,
-        #})
-        #print "\nTraining complete!"
-        #print sess_.run(accuracy_,
-        #                feed_dict={
-        #                    rate_placeholder_: 0,
-        #                    num_data_placeholder_: batch_size_
-        #                })
-        # test_writer.close()
-        # train_writer.close()
+        sess_.run(test_init_op_, feed_dict={
+           input_placeholder_: test_data_,
+           output_placeholder_: test_labels_,
+        })
+        print sess_.run(accuracy_,
+                        feed_dict={
+                            rate_placeholder_: 0,
+                            num_data_placeholder_: batch_size_
+                        })
+        test_writer.close()
+        train_writer.close()
