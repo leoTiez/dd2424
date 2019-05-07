@@ -16,6 +16,7 @@ def rcl(
         num_filter,
         filter_shape,
         num_of_data,
+        device_name,
         depth=3,
         std=.03,
         alpha=1e-3,
@@ -55,50 +56,51 @@ def rcl(
 
     forward_output = tf.nn.conv2d(input_data, forward_weights, [1, 1, 1, 1], padding='SAME')
 
-    def loop_body(x, recurrent_states, output):
-        recurrent_output = tf.nn.conv2d(recurrent_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
+    if "CPU" in device_name.upper():
+        def loop_body(x, recurrent_states, output):
+            recurrent_output = tf.nn.conv2d(recurrent_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
 
-        output = tf.add(forward_output, recurrent_output)
-        output += bias
+            output = tf.add(forward_output, recurrent_output)
+            output += bias
 
-        recurrent_states = tf.nn.local_response_normalization(
-            tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
-            depth_radius=normalization_feature_maps,
-            bias=1,
-            alpha=alpha,
-            beta=beta,
-            name=name + '_lrn'
-        )
-        x += 1
-        return x, recurrent_states, output
+            recurrent_states = tf.nn.local_response_normalization(
+                tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+                depth_radius=normalization_feature_maps,
+                bias=1,
+                alpha=alpha,
+                beta=beta,
+                name=name + '_lrn'
+            )
+            x += 1
+            return x, recurrent_states, output
 
-    results = tf.while_loop(
-        lambda x, recurrent_states, output: x < depth,
-        loop_body,
-        [0, cell_states, output],
-    )
-
-    return results[2]
-
-    # Use this loop instead of the tensorflow while loop since it causes trouble running it on the gpu
-    # When it is used without the optimiser it is assumed to be never executed, and hence, a dead end
-    for _ in range(depth):
-        recurrent_output = tf.nn.conv2d(cell_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
-
-        output = tf.add(forward_output, recurrent_output)
-        output += bias
-
-        cell_states = tf.nn.local_response_normalization(
-            tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
-            depth_radius=normalization_feature_maps,
-            bias=1,
-            alpha=alpha,
-            beta=beta,
-            name=name + '_lrn'
+        results = tf.while_loop(
+            lambda x, recurrent_states, output: x < depth,
+            loop_body,
+            [0, cell_states, output],
         )
 
-    return output
+        return results[2]
 
+    else:
+        # Use this loop instead of the tensorflow while loop since it causes trouble running it on the gpu
+        # When it is used without the optimiser it is assumed to be never executed, and hence, a dead end
+        for _ in range(depth):
+            recurrent_output = tf.nn.conv2d(cell_states, recurrent_weights, [1, 1, 1, 1], padding='SAME')
+
+            output = tf.add(forward_output, recurrent_output)
+            output += bias
+
+            cell_states = tf.nn.local_response_normalization(
+                tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+                depth_radius=normalization_feature_maps,
+                bias=1,
+                alpha=alpha,
+                beta=beta,
+                name=name + '_lrn'
+            )
+
+        return output
 
 
 def convolutional_layer(
@@ -184,10 +186,10 @@ class RCNN:
     def __init__(
             self,
             input_shape,
+            device_name="/cpu:0",
             output_shape=[None, 10],
             learning_rate=.1,
             num_filter=64,
-            batch_size=100,
             shuffle_buffer_size=10000,
             conv_layer_filter_shape=[5, 5],
             rec_conv_layer_filter_shape=[3, 3],
@@ -196,6 +198,8 @@ class RCNN:
     ):
         self.input_placeholder = tf.placeholder(PRECISION_TF, input_shape)
         self.output_placeholder = tf.placeholder(PRECISION_TF, output_shape)
+
+        self.device_name = device_name
 
         # dropout probability placeholder
         self.rate_placeholder = tf.placeholder(PRECISION_TF)
@@ -221,7 +225,7 @@ class RCNN:
         # Defines the pipeline and creates a pointer to the next data point
         features, labels = data_iterator.get_next()
 
-        with tf.device("/gpu:0"):
+        with tf.device(self.device_name):
             # Net definition
             # First convolutional layer
             conv_layer = convolutional_layer(
@@ -243,6 +247,7 @@ class RCNN:
                 input_data=pooling_1,
                 num_input_channels=num_filter,
                 num_of_data=self.num_data_placeholder,
+                device_name=self.device_name,
                 filter_shape=rec_conv_layer_filter_shape,
                 num_filter=num_filter,
                 name='rcl_layer_1'
@@ -257,6 +262,7 @@ class RCNN:
             rcl_layer_2 = rcl(
                 input_data=dropout_1,
                 num_of_data=self.num_data_placeholder,
+                device_name=self.device_name,
                 num_input_channels=num_filter,
                 filter_shape=rec_conv_layer_filter_shape,
                 num_filter=num_filter,
@@ -279,6 +285,7 @@ class RCNN:
             rcl_layer_3 = rcl(
                 input_data=dropout_2,
                 num_of_data=self.num_data_placeholder,
+                device_name=self.device_name,
                 num_input_channels=num_filter,
                 filter_shape=rec_conv_layer_filter_shape,
                 num_filter=num_filter,
@@ -294,6 +301,7 @@ class RCNN:
             rcl_layer_4 = rcl(
                 input_data=dropout_3,
                 num_of_data=self.num_data_placeholder,
+                device_name=self.device_name,
                 num_input_channels=num_filter,
                 filter_shape=rec_conv_layer_filter_shape,
                 num_filter=num_filter,
@@ -397,6 +405,15 @@ class RCNN:
 
 
 if __name__ == '__main__':
+    # gpu or cpu
+    device_name_ = sys.argv[1]
+
+    if device_name_.upper() == "CPU" or device_name is None:
+        device_name_ = "/cpu:0"
+    elif device_name_.upper() == "GPU":
+        device_name_ = "/gpu:0"
+    else:
+        raise ValueError("Device type is not supported. Use either GPU or CPU")
     # Setting the parameters
     input_shape_ = [None, 28, 28, 1]
     output_shape_ = [None, 10]
@@ -421,7 +438,10 @@ if __name__ == '__main__':
     test_data_ = training_data_np_[-test_data_size_:]
     test_labels_ = training_labels_np_[-test_data_size_:]
 
-    rcnn = RCNN(input_shape_)
+    rcnn = RCNN(
+        input_shape_,
+        device_name=device_name_
+    )
 
     rcnn.train(
         training_data_,
