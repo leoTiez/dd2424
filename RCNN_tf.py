@@ -182,8 +182,9 @@ def accuracy(
         labels,
         result
 ):
-    correct_prediction = tf.equal(tf.argmax(labels, 1), tf.argmax(result, 1))
-    return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    # correct_prediction = tf.equal(tf.argmax(labels, 1), tf.argmax(result, 1))
+    # return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    return tf.metrics.accuracy(labels=labels, predictions=result)[1]
 
 
 class RCNN:
