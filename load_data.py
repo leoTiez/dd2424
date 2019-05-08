@@ -92,8 +92,6 @@ def data_loader(dataset, file_name, dtype):
 ################################################################################
 ######################## OLDER CODE BELOW FOR REFERENCE ########################
 ################################################################################
-
-
 def load_mnist(file_name, dtype, file_path=DATA_DIR + '/mnist/'):
     data_dict = {}
     with open(file_path + 'mnist-' + file_name + '-images.gz', 'rb') as fo:
@@ -122,8 +120,6 @@ def load_cifar(file_name, dtype, file_path=DATA_DIR + '/cifar-10-batches-py/'):
     data_dict['data'] = np.asarray(data_dict['data'], dtype=dtype)
     data_dict['labels'] = np.asarray(data_dict['fine_labels'], dtype=dtype)
 
-    #print(np.unique(data_dict['labels']))
-
     return data_dict
 
 
@@ -138,6 +134,7 @@ def preprocess_cifar_data(cifar_data, cifar_labels, dtype):
 
     return cifar_data, to_categorical(cifar_labels, num_classes=100)
 
+TINYNET_DIR = '/tiny-imagenet-200/'
 
 def _tinynet_parse_ims(filename, label):
     image_string = tf.read_file(filename)
@@ -160,9 +157,6 @@ def _tinynet_build_val_map(val_file, id_map):
             # so will be filename => id
             val_map[row[0]] = id_map[row[1]]
     return val_map
-
-
-TINYNET_DIR = '/tiny-imagenet-200/'
 
 
 def load_tinynet_train(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
