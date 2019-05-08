@@ -17,7 +17,7 @@ import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.ERROR) # suppress warnings
 
 import numpy as np
-from load_data import load_mnist, preprocess_mnist_data
+from load_data import data_loader, load_tinynet_train
 
 # Constants
 # float64 is not allowed by all tf operations
@@ -476,66 +476,151 @@ class RCNN:
                     self.output_placeholder: val_data_labels,
                     self.num_data_placeholder: val_data_features.shape[0]
                 })
-                val_acc, accuracies = sess.run([self.accuracy, self.summaries],
-                                               feed_dict={
-                                                   self.rate_placeholder: 0,
-                                                   self.num_data_placeholder: val_data_features.shape[0]
-                                               })
+
+                val_acc, accuracies = sess.run(
+                    [self.accuracy, self.summaries],
+                    feed_dict={
+                        self.rate_placeholder: 0,
+                        self.num_data_placeholder: val_data_features.shape[0]
+                    }
+                )
+
                 test_writer.add_summary(accuracies)
+
                 print "\nEpoch:", (epoch + 1), \
                     "cost =", "{:.3f}".format(avg_cost), \
                     "test accuracy: {:.3f}".format(val_acc)
 
         test_writer.close()
         train_writer.close()
+
         if create_graph:
             writer.close()
 
 
 if __name__ == '__main__':
-    # gpu or cpu
-    device_name_ = sys.argv[1]
+    # GPU or CPU
+    processing_unit_ = sys.argv[1]
 
-    if device_name_.upper() == "CPU" or device_name_ is None:
-        device_name_ = "/cpu:0"
-    elif device_name_.upper() == "GPU":
-        device_name_ = "/gpu:0"
+    if processing_unit_.upper() == "CPU" or processing_unit_ is None:
+        processing_unit_ = "/cpu:0"
+    elif processing_unit_.upper() == "GPU":
+        processing_unit_ = "/gpu:0"
     else:
         raise ValueError("Device type is not supported. Use either GPU or CPU")
-    # Setting the parameters
-    input_shape_ = [None, 28, 28, 1]
-    output_shape_ = [None, 10]
-    learning_rate_ = .01
-    epochs_ = 5
-    # For me, setting the *_size to more than 2000 my system ran out of memory
-    # For the large scale tests it should not be an issue anymore and the test size can be increased
-    batch_size_ = 100
-    test_data_size_ = 2000
-    num_filter_ = 64
-    buffer_size_ = 10000
 
-    # Load and transform the data
-    mnist_dict_ = load_mnist('train', dtype=PRECISION_NP)
-    training_data_np_, training_labels_np_ = preprocess_mnist_data(
-        mnist_dict_['data'],
-        mnist_dict_['labels'],
-        dtype=PRECISION_NP
-    )
-    training_data_ = training_data_np_[:-test_data_size_]
-    training_labels_ = training_labels_np_[:-test_data_size_]
-    test_data_ = training_data_np_[-test_data_size_:]
-    test_labels_ = training_labels_np_[-test_data_size_:]
+    dataset_name_ = sys.argv[2]
+
+    if dataset_name_.upper() == "MNIST":
+        # Setting the parameters
+        input_shape_ = [None, 28, 28, 1]
+        output_shape_ = [None, 10]
+        learning_rate_ = .01
+        epochs_ = 5
+        batch_size_ = 100
+        test_data_size_ = 2000
+        num_filter_ = 64
+        buffer_size_ = 10000
+
+        training_data_np_, training_labels_np_ = data_loader(
+            "mnist",
+            "train",
+            dtype=PRECISION_NP
+        )
+
+        training_data_ = training_data_np_[:-test_data_size_]
+        training_labels_ = training_labels_np_[:-test_data_size_]
+        test_data_ = training_data_np_[-test_data_size_:]
+        test_labels_ = training_labels_np_[-test_data_size_:]
+
+    elif dataset_name_.upper() == "CIFAR10":
+        # Setting the parameters
+        input_shape_ = [None, 32, 32, 3]
+        output_shape_ = [None, 10]
+        learning_rate_ = .01
+        epochs_ = 5
+        batch_size_ = 100
+        num_filter_ = 64
+        buffer_size_ = 10000
+
+        training_data_ = np.empty((0, 32, 32, 3))
+        training_labels_ = np.empty((0, 10))
+        for i in range(1, 6):
+            training_data_batch_, training_labels_batch_ = data_loader(
+                "cifar10",
+                "data_batch_" + str(i),
+                dtype=PRECISION_NP
+            )
+
+            training_data_ = np.concatenate((training_data_,
+                    training_data_batch_))
+            training_labels_ = np.concatenate((training_labels_,
+                    training_labels_batch_))
+
+        test_data_, test_labels_ = data_loader(
+            "cifar10",
+            "test_batch",
+            dtype=PRECISION_NP
+        )
+
+    elif dataset_name_.upper() == "CIFAR100":
+        # Setting the parameters
+        input_shape_ = [None, 32, 32, 3]
+        output_shape_ = [None, 100]
+        learning_rate_ = .01
+        epochs_ = 5
+        batch_size_ = 100
+        test_data_size_ = 2000
+        num_filter_ = 64
+        buffer_size_ = 10000
+
+        training_data_, training_labels_ = data_loader(
+            "cifar100",
+            "train",
+            dtype=PRECISION_NP
+        )
+
+        test_data_, test_labels_ = data_loader(
+            "cifar100",
+            "test",
+            dtype=PRECISION_NP
+        )
+
+    elif dataset_name_.upper() == "TINYNET":
+        # Setting the parameters
+        input_shape_ = [None, 32, 32, 3]
+        output_shape_ = [None, 100]
+        learning_rate_ = .01
+        epochs_ = 5
+        batch_size_ = 100
+        test_data_size_ = 2000
+        num_filter_ = 64
+        buffer_size_ = 10000
+
+        #dataset = load_tinynet_train()
+        #training_data_np_, training_labels_np_ = data_loader(
+            #"tinynet",
+            #None,
+            #dtype=PRECISION_NP
+        #)
+
+    else:
+        raise Exception("dataset has to be one of 'mnist', 'cifar10', 'cifar100' or 'tinynet'.")
 
     rcnn = RCNN(
-        input_shape_,
+        input_shape=input_shape_,
+        processing_unit=processing_unit_,
+        output_shape=output_shape_,
         learning_rate=learning_rate_,
-        device_name=device_name_
+        num_filter=num_filter_,
+        shuffle_buffer_size=buffer_size_,
     )
 
     rcnn.train(
-        training_data_,
-        training_labels_,
-        test_data_,
-        test_labels_,
+        training_data_features=training_data_,
+        training_data_labels=training_labels_,
+        val_data_features=test_data_,
+        val_data_labels=test_labels_,
         epochs=epochs_
     )
+
