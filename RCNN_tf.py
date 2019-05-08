@@ -427,9 +427,26 @@ class RCNN:
 
             train_writer = tf.summary.FileWriter('logs/train', sess.graph)
             test_writer = tf.summary.FileWriter('logs/test')
+
             # initialise the variables
             sess.run(self.global_init_op)
             sess.run(self.local_init_op)
+
+            if print_variable_names:
+                print "\nThe network contains the following trainable parameters:"
+                variables_names = [v.name for v in tf.trainable_variables()]
+                values = sess.run(variables_names)
+                total_parameters = 0
+                for k, v in zip(variables_names, values):
+                    print "Variable: " + k[:-2] + ". Shape: " + str(v.shape)
+
+                    variable_parameters = 1
+                    for dim in v.shape:
+                        variable_parameters *= dim
+
+                    total_parameters += variable_parameters
+
+                print "\nTotal number of trainable parameters:", total_parameters, "\n"
 
             total_batch = int(training_data_features.shape[0] / batch_size)
             for epoch in range(epochs):
