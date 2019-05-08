@@ -1,3 +1,14 @@
+#!/usr/bin/python2
+
+"""RCNN_tf.py: Implementation of the Recurrent Convolutional Neural Network
+as proposed in "Recurrent Convolutional Neural Network for Object Recognition"
+by Ming Liang and Xiaolin Hu (2015).
+
+A project for the 2019 DD2424 Deep Learning in Data Science course at KTH
+Royal Institute of Technology"""
+
+__author__ = "Adrian Chmielewski-Anders, Leo Zeitler & Bas Straathof"
+
 import sys
 import tensorflow as tf
 import numpy as np
