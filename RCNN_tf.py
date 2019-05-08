@@ -10,7 +10,12 @@ Royal Institute of Technology"""
 __author__ = "Adrian Chmielewski-Anders, Leo Zeitler & Bas Straathof"
 
 import sys
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # suppress warnings
+
 import tensorflow as tf
+tf.logging.set_verbosity(tf.logging.ERROR) # suppress warnings
+
 import numpy as np
 from load_data import load_mnist, preprocess_mnist_data
 
