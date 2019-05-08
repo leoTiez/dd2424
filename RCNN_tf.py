@@ -17,7 +17,7 @@ import tensorflow as tf
 tf.logging.set_verbosity(tf.logging.ERROR) # suppress warnings
 
 import numpy as np
-from load_data import data_loader, load_tinynet_train
+from load_data import data_loader
 
 # Constants
 # float64 is not allowed by all tf operations
@@ -586,24 +586,6 @@ if __name__ == '__main__':
             "test",
             dtype=PRECISION_NP
         )
-
-    elif dataset_name_.upper() == "TINYNET":
-        # Setting the parameters
-        input_shape_ = [None, 32, 32, 3]
-        output_shape_ = [None, 100]
-        learning_rate_ = .01
-        epochs_ = 5
-        batch_size_ = 100
-        test_data_size_ = 2000
-        num_filter_ = 64
-        buffer_size_ = 10000
-
-        #dataset = load_tinynet_train()
-        #training_data_np_, training_labels_np_ = data_loader(
-            #"tinynet",
-            #None,
-            #dtype=PRECISION_NP
-        #)
 
     else:
         raise Exception("dataset has to be one of 'mnist', 'cifar10', 'cifar100' or 'tinynet'.")
