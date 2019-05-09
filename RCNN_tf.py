@@ -498,8 +498,8 @@ class RCNN:
                 )
             )
 
-            # AdamOptimizer
-            self.optimiser = tf.train.AdamOptimizer(learning_rate=learning_rate
+            # AdagradOptimizer
+            self.optimiser = tf.train.AdagradOptimizer(learning_rate=learning_rate
                 ).minimize(self.cross_entropy)
 
             # Accuracy
