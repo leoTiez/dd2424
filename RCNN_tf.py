@@ -66,7 +66,6 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
     ]
 
     cell_states = tf.fill(dims=recurrent_cells_shape, value=0.0)
-    output = tf.fill(dims=recurrent_cells_shape, value=0.0)
 
     initializer = tf.contrib.layers.variance_scaling_initializer()
 
@@ -104,85 +103,91 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
         padding='SAME'
     )
 
-    if "CPU" in processing_unit.upper():
-        def termination_cond():
-            """Specifies the termination condition for the Tensorflow
-            while loop"""
-            return lambda x, recurrent_states, output: x < depth
+    output = forward_output
+    if depth == 0:
+        output = tf.nn.bias_add(output, bias)
 
-        def loop_body(x, recurrent_states, output):
-            """Specifies the body callable of the Tensorflow while loop
+    # if "CPU" in processing_unit.upper():
+    def termination_cond():
+        """Specifies the termination condition for the Tensorflow
+        while loop"""
+        return lambda x, recurrent_states, output: x < depth
 
-            Args/Returns:
-                x                (tf.Tensor): counter
-                recurrent_states (tf.Tensor): the recurrent states of the
-                                              recurrent convolutional layer
-                output           (tf.Tensor): the output tensor, which is the
-                                              addition of the forward and
-                                              recurrent output and the bias
-            """
-            recurrent_output = tf.nn.conv2d(
-                    recurrent_states,
-                    recurrent_weights,
-                    [1, 1, 1, 1],
-                    padding='SAME')
+    def loop_body(x, recurrent_states, output):
+        """Specifies the body callable of the Tensorflow while loop
 
-            output = tf.add(forward_output, recurrent_output)
-            output += bias
-
-            recurrent_states = tf.nn.local_response_normalization(
-                tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
-                depth_radius=num_norm_feat_maps,
-                bias=1,
-                alpha=alpha,
-                beta=beta,
-                name=name + '_lrn'
-            )
-
-            x += 1
-
-            return x, recurrent_states, output
-
-        # TODO I am not sure why but this learns quicker. Investigate?
-        cond = termination_cond()
-        results = tf.while_loop(
-            cond=cond,
-            body=loop_body,
-            loop_vars=[0, cell_states, output],
-        )
-
-        output = results[2]
-
-        return output
-
-    elif "GPU" in processing_unit.upper():
-        # Use this loop instead of the tensorflow while loop since it causes
-        # trouble running it on the GPU.  When it is used without the optimiser
-        # it is assumed to be never executed, and hence, a dead end.
-        for _ in range(depth):
-            recurrent_output = tf.nn.conv2d(
-                cell_states,
+        Args/Returns:
+            x                (tf.Tensor): counter
+            recurrent_states (tf.Tensor): the recurrent states of the
+                                          recurrent convolutional layer
+            output           (tf.Tensor): the output tensor, which is the
+                                          addition of the forward and
+                                          recurrent output and the bias
+        """
+        recurrent_output = tf.nn.conv2d(
+                recurrent_states,
                 recurrent_weights,
                 [1, 1, 1, 1],
-                padding='SAME'
-            )
+                padding='SAME')
 
-            output = tf.add(forward_output, recurrent_output)
-            output += bias
+        output = tf.add(forward_output, recurrent_output)
+        output = tf.nn.bias_add(output, bias)
 
-            cell_states = tf.nn.local_response_normalization(
-                tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
-                depth_radius=num_norm_feat_maps,
-                bias=1,
-                alpha=alpha,
-                beta=beta,
-                name=name + '_lrn'
-            )
+        recurrent_states = tf.nn.local_response_normalization(
+            tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+            depth_radius=num_norm_feat_maps,
+            bias=1,
+            alpha=alpha,
+            beta=beta,
+            name=name + '_lrn'
+        )
 
-        return output
+        x += 1
 
-    else:
-        raise Exception("Processing unit has to be one of: cpu, gpu.")
+        return x, recurrent_states, output
+
+    # TODO I am not sure why but this learns quicker. Investigate?
+    cond = termination_cond()
+    results = tf.while_loop(
+        cond=cond,
+        body=loop_body,
+        loop_vars=[0, cell_states, output],
+        swap_memory=True
+    )
+
+    output = results[2]
+
+    return output
+
+    # TODO is this necessary when using swap memory?
+    # elif "GPU" in processing_unit.upper():
+    #     # Use this loop instead of the tensorflow while loop since it causes
+    #     # trouble running it on the GPU.  When it is used without the optimiser
+    #     # it is assumed to be never executed, and hence, a dead end.
+    #     for _ in range(depth):
+    #         recurrent_output = tf.nn.conv2d(
+    #             cell_states,
+    #             recurrent_weights,
+    #             [1, 1, 1, 1],
+    #             padding='SAME'
+    #         )
+    #
+    #         output = tf.add(forward_output, recurrent_output)
+    #         output += bias
+    #
+    #         cell_states = tf.nn.local_response_normalization(
+    #             tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+    #             depth_radius=num_norm_feat_maps,
+    #             bias=1,
+    #             alpha=alpha,
+    #             beta=beta,
+    #             name=name + '_lrn'
+    #         )
+    #
+    #     return output
+    #
+    # else:
+    #     raise Exception("Processing unit has to be one of: cpu, gpu.")
 
 
 def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
@@ -343,6 +348,7 @@ class RCNN:
             learning_rate=.1,
             num_filter=64,
             shuf_buf_size=10000,
+            recurrent_depth=3,
             conv_filter_shape=[5, 5],
             rconv_filter_shape=[3, 3],
             pool_shape=[3, 3],
@@ -413,6 +419,7 @@ class RCNN:
                 processing_unit=self.processing_unit,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_1'
             )
 
@@ -431,6 +438,7 @@ class RCNN:
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_2'
             )
 
@@ -456,6 +464,7 @@ class RCNN:
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_3'
             )
 
@@ -474,6 +483,7 @@ class RCNN:
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_4'
             )
 
