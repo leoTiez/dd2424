@@ -39,8 +39,8 @@ def main(argv):
 
     elif dataset_name_.upper() == "CIFAR10":
         # Setting the parameters
-        use_greyscale = False
-        if not use_greyscale:
+        use_grayscale = False
+        if not use_grayscale:
             input_shape_ = [None, 32, 32, 3]
         else:
             input_shape_ = [None, 32, 32, 1]
@@ -53,7 +53,7 @@ def main(argv):
         buffer_size_ = 10000
         recurrent_depth_ = 3
 
-        if not use_greyscale:
+        if not use_grayscale:
             training_data_ = np.empty((0, 32, 32, 3))
         else:
             training_data_ = np.empty((0, 32, 32, 1))
@@ -64,7 +64,7 @@ def main(argv):
                 "cifar10",
                 "data_batch_" + str(i),
                 dtype=RCNN_tf.PRECISION_NP,
-                use_grayscale=use_greyscale
+                use_grayscale=use_grayscale
             )
 
             training_data_ = np.concatenate((training_data_,
@@ -76,13 +76,13 @@ def main(argv):
             "cifar10",
             "test_batch",
             dtype=RCNN_tf.PRECISION_NP,
-            use_grayscale=use_greyscale
+            use_grayscale=use_grayscale
         )
 
     elif dataset_name_.upper() == "CIFAR100":
         # Setting the parameters
-        use_greyscale = False
-        if not use_greyscale:
+        use_grayscale = False
+        if not use_grayscale:
             input_shape_ = [None, 32, 32, 3]
         else:
             input_shape_ = [None, 32, 32, 1]
@@ -99,14 +99,14 @@ def main(argv):
             "cifar100",
             "train",
             dtype=RCNN_tf.PRECISION_NP,
-            use_grayscale=use_greyscale
+            use_grayscale=use_grayscale
         )
 
         test_data_, test_labels_ = data_loader(
             "cifar100",
             "test",
             dtype=RCNN_tf.PRECISION_NP,
-            use_grayscale=use_greyscale
+            use_grayscale=use_grayscale
         )
 
     else:
