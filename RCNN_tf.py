@@ -38,7 +38,7 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
         filter_shape      (list): the shape of the 2D filter
         num_of_data  (tf.Tensor): holds the batch size
         processing_unit    (str): specifies whether a GPU or CPU is used
-        depth              (int): depth of the ???
+        depth              (int): number of recurrent convolutions
         stddev           (float): standard deviation
         alpha            (float): constant controlling normalization amplitude
         beta             (float): constant controlling normalization amplitude
@@ -106,7 +106,6 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
             while loop"""
             return lambda x, recurrent_states, output: x < depth
 
-
         def loop_body(x, recurrent_states, output):
             """Specifies the body callable of the Tensorflow while loop
 
@@ -140,8 +139,10 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
 
             return x, recurrent_states, output
 
+        # TODO I am not sure why but this learns quicker. Investigate?
+        cond = termination_cond()
         results = tf.while_loop(
-            cond=termination_cond(),
+            cond=cond,
             body=loop_body,
             loop_vars=[0, cell_states, output],
         )
@@ -181,7 +182,7 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
 
 
 def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
-        stddev=.03, stride=(1, 1), padding='same', name='conv'):
+        stddev=.03, stride=[1, 1], padding='same', name='conv'):
     """Defines a convolutional layer
 
     Args:
@@ -190,8 +191,8 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
         num_filter         (int): the number of filters
         filter_shape      (list): the shape of the 2D filter
         stddev           (float): standard deviation
-        stride           (tuple): ???
-        padding            (str): ???
+        stride           (List(int)): step size for the filter
+        padding            (str): defines whether to fill up the surrounding frame with zeros or not
         name               (str): name to identify the layer
 
     Returns:
@@ -216,14 +217,14 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
     return output
 
 
-def pooling_layer(input_data, pool_shape, stride=(1, 1), padding='same'):
+def pooling_layer(input_data, pool_shape, stride=[1, 1], padding='same'):
     """Defines a pooling layer
 
     Args:
         input_data (tf.Tensor): 4D data tensor
         pool_shape      (list): the shape of the 2D filter
-        stride         (tuple): ???
-        padding          (str): ???
+        stride         (List(int)): step size for the filter
+        padding          (str): defines whether to fill up the surrounding frame with zeros or not
 
     Returns:
         output       (tf.Tensor): output tensor of the pooling layer
@@ -337,7 +338,7 @@ class RCNN:
             pool_stride_shape=[2, 2]
         ):
 
-        # Input and output shape placeholders
+        # Input and output placeholders
         self.input_placeholder = tf.placeholder(PRECISION_TF, input_shape)
         self.output_placeholder = tf.placeholder(PRECISION_TF, output_shape)
 
@@ -355,12 +356,11 @@ class RCNN:
             self.input_placeholder,
             self.output_placeholder)
             ).shuffle(buffer_size=shuf_buf_size
-            ).repeat(
-            ).batch(batch_size=self.num_data_placeholder)
+            ).repeat().batch(batch_size=self.num_data_placeholder)
 
         test_data_set = tf.data.Dataset.from_tensor_slices((
             self.input_placeholder,
-            self.output_placeholder,)
+            self.output_placeholder)
             ).batch(batch_size=self.num_data_placeholder)
 
         # Create Iterator
@@ -376,7 +376,7 @@ class RCNN:
         # Defines the pipeline and creates a pointer to the next data point
         features, labels = data_iterator.get_next()
 
-        ### Definition of the neural network
+        # Definition of the neural network
         with tf.device(self.processing_unit):
             # First convolutional layer
             conv_layer = convolutional_layer(
@@ -502,7 +502,6 @@ class RCNN:
         self.summaries = tf.summary.merge_all()
         self.global_init_op = tf.global_variables_initializer()
         self.local_init_op = tf.local_variables_initializer()
-
 
     def train(self, train_data_feats, train_data_labels, val_data_feats,
             val_data_labels, batch_size=100, epochs=7, create_graph=True,
@@ -686,8 +685,8 @@ if __name__ == '__main__':
         )
 
     else:
-        raise Exception("dataset has to be one of 'mnist', 'cifar10', "
-                        "'cifar100' or 'tinynet'.")
+        raise Exception("dataset has to be one of 'mnist', 'cifar10' or "
+                        "'cifar100'.")
 
     rcnn = RCNN(
         input_shape=input_shape_,
