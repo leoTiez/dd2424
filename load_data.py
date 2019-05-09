@@ -97,5 +97,4 @@ def data_loader(dataset, file_name, dtype, use_grayscale=False):
         labels = to_categorical(np.asarray(data_dict['fine_labels'], dtype=dtype),
                 num_classes=100)
 
-    return data[:500], labels[:500]
-
+    return data, labels
