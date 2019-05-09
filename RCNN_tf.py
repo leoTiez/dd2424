@@ -107,7 +107,6 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
     if depth == 0:
         output = tf.nn.bias_add(output, bias)
 
-    # if "CPU" in processing_unit.upper():
     def termination_cond():
         """Specifies the termination condition for the Tensorflow
         while loop"""
@@ -158,36 +157,6 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
     output = results[2]
 
     return output
-
-    # TODO is this necessary when using swap memory?
-    # elif "GPU" in processing_unit.upper():
-    #     # Use this loop instead of the tensorflow while loop since it causes
-    #     # trouble running it on the GPU.  When it is used without the optimiser
-    #     # it is assumed to be never executed, and hence, a dead end.
-    #     for _ in range(depth):
-    #         recurrent_output = tf.nn.conv2d(
-    #             cell_states,
-    #             recurrent_weights,
-    #             [1, 1, 1, 1],
-    #             padding='SAME'
-    #         )
-    #
-    #         output = tf.add(forward_output, recurrent_output)
-    #         output += bias
-    #
-    #         cell_states = tf.nn.local_response_normalization(
-    #             tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
-    #             depth_radius=num_norm_feat_maps,
-    #             bias=1,
-    #             alpha=alpha,
-    #             beta=beta,
-    #             name=name + '_lrn'
-    #         )
-    #
-    #     return output
-    #
-    # else:
-    #     raise Exception("Processing unit has to be one of: cpu, gpu.")
 
 
 def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
