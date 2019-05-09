@@ -68,26 +68,31 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
     cell_states = tf.fill(dims=recurrent_cells_shape, value=0.0)
     output = tf.fill(dims=recurrent_cells_shape, value=0.0)
 
+    initializer = tf.contrib.layers.variance_scaling_initializer()
+
     forward_weights = tf.Variable(
-        tf.truncated_normal(
-            conv_filter_forward_shape,
-            stddev=stddev,
-            dtype=PRECISION_TF),
+        initializer(conv_filter_forward_shape),
+        #tf.truncated_normal(
+            #conv_filter_forward_shape,
+            #stddev=stddev,
+            #dtype=PRECISION_TF),
         trainable=True,
         name=name + '_forward'
     )
 
     recurrent_weights = tf.Variable(
-        tf.truncated_normal(
-            conv_filter_recurrent_shape,
-            stddev=stddev,
-            dtype=PRECISION_TF),
+        #tf.truncated_normal(
+            #conv_filter_recurrent_shape,
+            #stddev=stddev,
+            #dtype=PRECISION_TF),
+        initializer(conv_filter_recurrent_shape),
         trainable=True,
         name=name + '_recurrent'
     )
 
     bias = tf.Variable(
-        tf.truncated_normal([num_filter], dtype=PRECISION_TF),
+        #tf.truncated_normal([num_filter], dtype=PRECISION_TF),
+        initializer([num_filter]),
         trainable=True,
         name=name + '_bias'
     )
@@ -201,8 +206,11 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
             num_filter]
     strides = [1, stride[0], stride[1], 1]
 
+    initializer = tf.contrib.layers.variance_scaling_initializer()
+
     weights = tf.Variable(
-        tf.truncated_normal(conv_filter_shape, stddev=stddev, dtype=PRECISION_TF),
+        #tf.truncated_normal(conv_filter_shape, stddev=stddev, dtype=PRECISION_TF),
+        initializer(conv_filter_shape),
         trainable=True,
         name=name + '_weights'
     )
@@ -274,14 +282,18 @@ def softmax_layer(input_data, num_input_dim, num_output_dim, stddev=.03,
         linear_trans (tf.Tensor): the linear transformation of the input tensor,
                                   multiplied by the weights plus the bias
     """
+    initializer = tf.contrib.layers.variance_scaling_initializer()
+
     weights = tf.Variable(
-        tf.truncated_normal([num_input_dim, num_output_dim], stddev=stddev),
+        #tf.truncated_normal([num_input_dim, num_output_dim], stddev=stddev),
+        initializer([num_input_dim, num_output_dim]),
         trainable=True,
         name=name + '_weights'
     )
 
     bias = tf.Variable(
-        tf.truncated_normal([num_output_dim], stddev=stddev),
+        #tf.truncated_normal([num_output_dim], stddev=stddev),
+        initializer([num_output_dim]),
         trainable=True,
         name=name + '_bias'
     )
