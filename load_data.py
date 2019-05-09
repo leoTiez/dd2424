@@ -9,10 +9,7 @@ from tensorflow.contrib.learn.python.learn.datasets.mnist import \
 from tensorflow.python.keras.utils import to_categorical
 import cPickle
 import numpy as np
-from os import environ, path, listdir
-import tensorflow as tf
-import csv
-from PIL import Image
+from os import environ
 
 DATA_DIR = './data'
 if 'DATA_DIRECTORY' in environ:
