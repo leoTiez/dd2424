@@ -48,10 +48,10 @@ def main(argv):
         output_shape_ = [None, 10]
         learning_rate_ = .001
         epochs_ = 20
-        batch_size_ = 1
+        batch_size_ = 100
         num_filter_ = 96
         buffer_size_ = 10000
-        recurrent_depth_ = 3
+        recurrent_depth_ = 0
 
         if not use_grayscale:
             training_data_ = np.empty((0, 32, 32, 3))
