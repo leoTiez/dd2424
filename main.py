@@ -19,23 +19,23 @@ def main(argv):
         # Setting the parameters
         input_shape_ = [None, 28, 28, 1]
         output_shape_ = [None, 10]
-        learning_rate_ = .01
-        epochs_ = 5
-        batch_size_ = 100
-        test_data_size_ = 2000
+        learning_rate_ = .001
+        epochs_ = 20
+        batch_size_ = 64
         num_filter_ = 64
         buffer_size_ = 10000
 
-        training_data_np_, training_labels_np_ = data_loader(
+        training_data_, training_labels_ = data_loader(
             "mnist",
             "train",
             dtype=RCNN_tf.PRECISION_NP
         )
 
-        training_data_ = training_data_np_[:-test_data_size_]
-        training_labels_ = training_labels_np_[:-test_data_size_]
-        test_data_ = training_data_np_[-test_data_size_:]
-        test_labels_ = training_labels_np_[-test_data_size_:]
+        test_data_, test_labels_ = data_loader(
+            "mnist",
+            "test",
+            dtype=RCNN_tf.PRECISION_NP
+        )
 
     elif dataset_name_.upper() == "CIFAR10":
         # Setting the parameters
