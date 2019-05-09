@@ -151,7 +151,9 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
         cond=cond,
         body=loop_body,
         loop_vars=[0, cell_states, output],
-        swap_memory=True
+        swap_memory=True,
+        back_prop=True,
+        parallel_iterations=1
     )
 
     output = results[2]
