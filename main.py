@@ -51,7 +51,7 @@ def main(argv):
         batch_size_ = 100
         num_filter_ = 96
         buffer_size_ = 10000
-        recurrent_depth_ = 0
+        recurrent_depth_ = 3
 
         if not use_grayscale:
             training_data_ = np.empty((0, 32, 32, 3))
