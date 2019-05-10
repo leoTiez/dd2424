@@ -65,7 +65,7 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
         num_filter
     ]
 
-    cell_states = tf.fill(dims=recurrent_cells_shape, value=0.0)
+    # cell_states = tf.fill(dims=recurrent_cells_shape, value=0.0)
 
     initializer = tf.contrib.layers.variance_scaling_initializer()
 
@@ -104,8 +104,15 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
     )
 
     output = forward_output
-    if depth == 0:
-        output = tf.nn.bias_add(output, bias)
+    output = tf.nn.bias_add(output, bias)
+    cell_states = tf.nn.local_response_normalization(
+        tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+        depth_radius=num_norm_feat_maps,
+        bias=1,
+        alpha=alpha,
+        beta=beta,
+        name=name + '_lrn'
+    )
 
     def termination_cond():
         """Specifies the termination condition for the Tensorflow
