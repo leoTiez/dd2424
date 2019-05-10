@@ -479,9 +479,10 @@ class RCNN:
                 )
             )
 
-            # AdagradOptimizer
-            self.optimiser = tf.train.AdagradOptimizer(learning_rate=learning_rate
-                ).minimize(self.cross_entropy)
+            # Gradient Descent Optimizer
+            self.optimiser = tf.train.GradientDescentOptimizer(
+                learning_rate=learning_rate
+            ).minimize(self.cross_entropy)
 
             # Accuracy
             self.accuracy = accuracy(
