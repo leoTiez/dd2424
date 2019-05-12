@@ -312,9 +312,12 @@ class RCNN:
 
         # Processing unit placeholder
         self.processing_unit = processing_unit
+        self.init_learning_rate = learning_rate
 
         # Dropout probability placeholder
         self.rate_placeholder = tf.placeholder(PRECISION_TF)
+        # Adaptive learning rate placeholder
+        self.adaptive_learning_rate_placeholder = tf.placeholder(PRECISION_TF)
 
         # Number of data placeholder
         self.num_data_placeholder = tf.placeholder(tf.int64)
@@ -372,6 +375,7 @@ class RCNN:
                 depth=recurrent_depth,
                 name='rcl_layer_1'
             )
+
 
             # First dropout layer
             dropout_1 = tf.nn.dropout(
@@ -457,7 +461,7 @@ class RCNN:
 
             # Gradient Descent Optimizer
             self.optimiser = tf.train.GradientDescentOptimizer(
-                learning_rate=learning_rate
+                learning_rate=self.adaptive_learning_rate_placeholder
             ).minimize(self.cross_entropy)
 
             # Accuracy
@@ -473,21 +477,28 @@ class RCNN:
         self.local_init_op = tf.local_variables_initializer()
 
     def train(self, train_data_feats, train_data_labels, val_data_feats,
-            val_data_labels, batch_size=100, epochs=7, create_graph=True,
-            print_vars=True):
+              val_data_labels, batch_size=100, epochs=7, create_graph=True,
+              adaptive_learning_factor=1, performance_update_threshold=3,
+              min_difference_accuracy=.1, print_vars=True):
         """Trains the neural network
 
         Args:
-            train_data_feats  (np.ndarray): features of the training set
-            train_data_labels (np.ndarray): lables of the training set
-            val_data_feats    (np.ndarray): features of the validation set
-            val_data_lables   (np.ndarray): labels of the validation set
-            batch_size               (int): the size of a training batch
-            epochs                   (int): number of training epochs
-            create_graph            (bool): decides whether the network graph
-                                            is computed
-            print_vars              (bool): decides whether information about
-                                            variables is printed
+            train_data_feats       (np.ndarray): features of the training set
+            train_data_labels      (np.ndarray): lables of the training set
+            val_data_feats         (np.ndarray): features of the validation set
+            val_data_labels        (np.ndarray): labels of the validation set
+            batch_size                    (int): the size of a training batch
+            epochs                        (int): number of training epochs
+            create_graph                 (bool): decides whether the network graph
+                                                 is computed
+            adaptive_learning_factor    (float): factor multiplied by the learning rate
+                                                 if performance criterion is not satisfied
+            performance_update_threshold  (int): How often the perfomrance does not need to increase
+                                                 before the learning rate is adapted
+            min_difference_accuracy     (float): The minimum difference to say the performance
+                                                 has increased sufficiently
+            print_vars                   (bool): decides whether information about
+                                                 variables is printed
         """
         with tf.Session() as sess:
             if create_graph:
@@ -519,6 +530,10 @@ class RCNN:
                 print "\nTotal number of trainable parameters:", total_parameters, "\n"
 
             total_batch = int(train_data_feats.shape[0] / batch_size)
+            best_performance = 0
+            last_update_of_performance = 0
+            learning_rate = self.init_learning_rate
+
             for epoch in range(epochs):
                 avg_cost = 0
                 sess.run(self.train_init_op, feed_dict={
@@ -530,10 +545,14 @@ class RCNN:
                     progress = (i / float(total_batch - 1)) * 100
                     print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
+                    if last_update_of_performance >= performance_update_threshold:
+                        learning_rate *= learning_rate * adaptive_learning_factor
+
                     accuracies, _, cost_ = sess.run(
                         [self.summaries, self.optimiser, self.cross_entropy],
                         feed_dict={
-                            self.rate_placeholder: 0.2
+                            self.rate_placeholder: 0.2,
+                            self.adaptive_learning_rate_placeholder: learning_rate
                         }
                     )
 
@@ -552,6 +571,12 @@ class RCNN:
                         self.rate_placeholder: 0
                     }
                 )
+
+                if val_acc - best_performance > min_difference_accuracy:
+                    best_performance = val_acc
+                    last_update_of_performance = 0
+                else:
+                    last_update_of_performance += 1
 
                 test_writer.add_summary(accuracies)
 
