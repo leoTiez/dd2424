@@ -9,7 +9,6 @@ Royal Institute of Technology"""
 
 __author__ = "Adrian Chmielewski-Anders, Leo Zeitler & Bas Straathof"
 
-import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # suppress warnings
 
@@ -23,10 +22,11 @@ import numpy as np
 PRECISION_TF = tf.float32
 PRECISION_NP = np.float32
 PADDING_LIST = ['SAME', 'VALID']
+initializer = tf.contrib.layers.variance_scaling_initializer()
 
 
-def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
-        processing_unit, depth=3, stddev=.03, alpha=1e-3, beta=.75,
+def rcl(input_data, num_input_chans, num_filter, filter_shape,
+        processing_unit, depth=3, alpha=1e-3, beta=.75,
         num_norm_feat_maps=7, name='rcl'):
     """Defines a recurrent convolutional layer
 
@@ -35,10 +35,8 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
         num_input_chans    (int): the number of input channels
         num_filter         (int): the number of filters
         filter_shape      (list): the shape of the 2D filter
-        num_of_data  (tf.Tensor): holds the batch size
         processing_unit    (str): specifies whether a GPU or CPU is used
         depth              (int): number of recurrent convolutions
-        stddev           (float): standard deviation
         alpha            (float): constant controlling normalization amplitude
         beta             (float): constant controlling normalization amplitude
         num_norm_feat_maps (int): number of normalization feature maps
@@ -58,39 +56,19 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
     conv_filter_recurrent_shape = [filter_shape[0], filter_shape[1], num_filter,
             num_filter]
 
-    recurrent_cells_shape = [
-        num_of_data,
-        input_data.shape[1].value,
-        input_data.shape[2].value,
-        num_filter
-    ]
-
-    # cell_states = tf.fill(dims=recurrent_cells_shape, value=0.0)
-
-    initializer = tf.contrib.layers.variance_scaling_initializer()
-
     forward_weights = tf.Variable(
         initializer(conv_filter_forward_shape),
-        #tf.truncated_normal(
-            #conv_filter_forward_shape,
-            #stddev=stddev,
-            #dtype=PRECISION_TF),
         trainable=True,
         name=name + '_forward'
     )
 
     recurrent_weights = tf.Variable(
-        #tf.truncated_normal(
-            #conv_filter_recurrent_shape,
-            #stddev=stddev,
-            #dtype=PRECISION_TF),
         initializer(conv_filter_recurrent_shape),
         trainable=True,
         name=name + '_recurrent'
     )
 
     bias = tf.Variable(
-        #tf.truncated_normal([num_filter], dtype=PRECISION_TF),
         initializer([num_filter]),
         trainable=True,
         name=name + '_bias'
@@ -169,7 +147,7 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
 
 
 def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
-        stddev=.03, stride=[1, 1], padding='same', name='conv'):
+        stride=[1, 1], padding='same', name='conv'):
     """Defines a convolutional layer
 
     Args:
@@ -177,7 +155,6 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
         num_input_chans    (int): the number of input channels
         num_filter         (int): the number of filters
         filter_shape      (list): the shape of the 2D filter
-        stddev           (float): standard deviation
         stride           (List(int)): step size for the filter
         padding            (str): defines whether to fill up the surrounding frame with zeros or not
         name               (str): name to identify the layer
@@ -186,13 +163,12 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
         output       (tf.Tensor): output tensor of the conv layer
     """
     conv_filter_shape = [filter_shape[0], filter_shape[1], num_input_chans,
-            num_filter]
+                         num_filter]
     strides = [1, stride[0], stride[1], 1]
 
     initializer = tf.contrib.layers.variance_scaling_initializer()
 
     weights = tf.Variable(
-        #tf.truncated_normal(conv_filter_shape, stddev=stddev, dtype=PRECISION_TF),
         initializer(conv_filter_shape),
         trainable=True,
         name=name + '_weights'
@@ -202,7 +178,7 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
         raise ValueError('Padding value is not understood')
 
     output = tf.nn.conv2d(input_data, weights, strides=strides,
-            padding=padding.upper())
+                          padding=padding.upper())
 
     return output
 
@@ -249,15 +225,14 @@ def global_max_pooling_layer(input_data):
     return output
 
 
-def softmax_layer(input_data, num_input_dim, num_output_dim, stddev=.03,
-        name='softmax'):
+def softmax_layer(input_data, num_input_dim, num_output_dim,
+                  name='softmax'):
     """Defines a softmax layer
 
     Args:
         input_data   (tf.Tensor): 4D data tensor
         num_input_dim      (int): the number of input dimensions
         num_output_dim     (int): the number of output dimensions
-        stddev           (float): standard deviation
         name               (str): name to identify the layer
 
     Returns:
@@ -268,14 +243,12 @@ def softmax_layer(input_data, num_input_dim, num_output_dim, stddev=.03,
     initializer = tf.contrib.layers.variance_scaling_initializer()
 
     weights = tf.Variable(
-        #tf.truncated_normal([num_input_dim, num_output_dim], stddev=stddev),
         initializer([num_input_dim, num_output_dim]),
         trainable=True,
         name=name + '_weights'
     )
 
     bias = tf.Variable(
-        #tf.truncated_normal([num_output_dim], stddev=stddev),
         initializer([num_output_dim]),
         trainable=True,
         name=name + '_bias'
@@ -292,7 +265,7 @@ def accuracy(labels, result):
 
     Args:
         labels  (tf.Tensor): the true labels
-        results (tf.Tensor): the predicted labels
+        result (tf.Tensor): the predicted labels
 
     Returns:
         acc     (tf.Tensor): the accuracy of the classifier
@@ -393,7 +366,6 @@ class RCNN:
             rcl_layer_1 = rcl(
                 input_data=pooling_1,
                 num_input_chans=num_filter,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
@@ -411,7 +383,6 @@ class RCNN:
             # Second recurrent convolutional layer
             rcl_layer_2 = rcl(
                 input_data=dropout_1,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
@@ -437,7 +408,6 @@ class RCNN:
             # Third recurrent convolutional layer
             rcl_layer_3 = rcl(
                 input_data=dropout_2,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
@@ -456,7 +426,6 @@ class RCNN:
             # Fourth recurrent convolutional layer
             rcl_layer_4 = rcl(
                 input_data=dropout_3,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
@@ -564,8 +533,7 @@ class RCNN:
                     accuracies, _, cost_ = sess.run(
                         [self.summaries, self.optimiser, self.cross_entropy],
                         feed_dict={
-                            self.rate_placeholder: 0.2,
-                            self.num_data_placeholder: batch_size,
+                            self.rate_placeholder: 0.2
                         }
                     )
 
@@ -581,8 +549,7 @@ class RCNN:
                 val_acc, accuracies = sess.run(
                     [self.accuracy, self.summaries],
                     feed_dict={
-                        self.rate_placeholder: 0,
-                        self.num_data_placeholder: val_data_feats.shape[0]
+                        self.rate_placeholder: 0
                     }
                 )
 
