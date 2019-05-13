@@ -500,7 +500,6 @@ class RCNN:
         with tf.Session() as sess:
             if create_graph:
                 writer = tf.summary.FileWriter('logs/.')
-                writer.flush()
                 writer.add_graph(sess.graph)
 
             train_writer = tf.summary.FileWriter('logs/train', sess.graph)
