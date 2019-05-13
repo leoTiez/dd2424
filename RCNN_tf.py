@@ -22,7 +22,7 @@ import numpy as np
 PRECISION_TF = tf.float32
 PRECISION_NP = np.float32
 PADDING_LIST = ['SAME', 'VALID']
-initializer = tf.contrib.layers.variance_scaling_initializer()
+INITIALIZER = tf.contrib.layers.variance_scaling_initializer()
 
 
 def rcl(input_data, num_input_chans, num_filter, filter_shape,
@@ -57,19 +57,19 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape,
             num_filter]
 
     forward_weights = tf.Variable(
-        initializer(conv_filter_forward_shape),
+        INITIALIZER(conv_filter_forward_shape),
         trainable=True,
         name=name + '_forward'
     )
 
     recurrent_weights = tf.Variable(
-        initializer(conv_filter_recurrent_shape),
+        INITIALIZER(conv_filter_recurrent_shape),
         trainable=True,
         name=name + '_recurrent'
     )
 
     bias = tf.Variable(
-        initializer([num_filter]),
+        INITIALIZER([num_filter]),
         trainable=True,
         name=name + '_bias'
     )
@@ -166,10 +166,8 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
                          num_filter]
     strides = [1, stride[0], stride[1], 1]
 
-    initializer = tf.contrib.layers.variance_scaling_initializer()
-
     weights = tf.Variable(
-        initializer(conv_filter_shape),
+        INITIALIZER(conv_filter_shape),
         trainable=True,
         name=name + '_weights'
     )
@@ -240,16 +238,15 @@ def softmax_layer(input_data, num_input_dim, num_output_dim,
         linear_trans (tf.Tensor): the linear transformation of the input tensor,
                                   multiplied by the weights plus the bias
     """
-    initializer = tf.contrib.layers.variance_scaling_initializer()
 
     weights = tf.Variable(
-        initializer([num_input_dim, num_output_dim]),
+        INITIALIZER([num_input_dim, num_output_dim]),
         trainable=True,
         name=name + '_weights'
     )
 
     bias = tf.Variable(
-        initializer([num_output_dim]),
+        INITIALIZER([num_output_dim]),
         trainable=True,
         name=name + '_bias'
     )
