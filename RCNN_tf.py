@@ -9,7 +9,6 @@ Royal Institute of Technology"""
 
 __author__ = "Adrian Chmielewski-Anders, Leo Zeitler & Bas Straathof"
 
-import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # suppress warnings
 
@@ -23,10 +22,11 @@ import numpy as np
 PRECISION_TF = tf.float32
 PRECISION_NP = np.float32
 PADDING_LIST = ['SAME', 'VALID']
+INITIALIZER = tf.contrib.layers.variance_scaling_initializer()
 
 
-def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
-        processing_unit, depth=3, stddev=.03, alpha=1e-3, beta=.75,
+def rcl(input_data, num_input_chans, num_filter, filter_shape,
+        processing_unit, depth=3, alpha=1e-3, beta=.75,
         num_norm_feat_maps=7, name='rcl'):
     """Defines a recurrent convolutional layer
 
@@ -35,10 +35,8 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
         num_input_chans    (int): the number of input channels
         num_filter         (int): the number of filters
         filter_shape      (list): the shape of the 2D filter
-        num_of_data  (tf.Tensor): holds the batch size
         processing_unit    (str): specifies whether a GPU or CPU is used
         depth              (int): number of recurrent convolutions
-        stddev           (float): standard deviation
         alpha            (float): constant controlling normalization amplitude
         beta             (float): constant controlling normalization amplitude
         num_norm_feat_maps (int): number of normalization feature maps
@@ -58,41 +56,20 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
     conv_filter_recurrent_shape = [filter_shape[0], filter_shape[1], num_filter,
             num_filter]
 
-    recurrent_cells_shape = [
-        num_of_data,
-        input_data.shape[1].value,
-        input_data.shape[2].value,
-        num_filter
-    ]
-
-    cell_states = tf.fill(dims=recurrent_cells_shape, value=0.0)
-    output = tf.fill(dims=recurrent_cells_shape, value=0.0)
-
-    initializer = tf.contrib.layers.variance_scaling_initializer()
-
     forward_weights = tf.Variable(
-        initializer(conv_filter_forward_shape),
-        #tf.truncated_normal(
-            #conv_filter_forward_shape,
-            #stddev=stddev,
-            #dtype=PRECISION_TF),
+        INITIALIZER(conv_filter_forward_shape),
         trainable=True,
         name=name + '_forward'
     )
 
     recurrent_weights = tf.Variable(
-        #tf.truncated_normal(
-            #conv_filter_recurrent_shape,
-            #stddev=stddev,
-            #dtype=PRECISION_TF),
-        initializer(conv_filter_recurrent_shape),
+        INITIALIZER(conv_filter_recurrent_shape),
         trainable=True,
         name=name + '_recurrent'
     )
 
     bias = tf.Variable(
-        #tf.truncated_normal([num_filter], dtype=PRECISION_TF),
-        initializer([num_filter]),
+        INITIALIZER([num_filter]),
         trainable=True,
         name=name + '_bias'
     )
@@ -104,89 +81,73 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape, num_of_data,
         padding='SAME'
     )
 
-    if "CPU" in processing_unit.upper():
-        def termination_cond():
-            """Specifies the termination condition for the Tensorflow
-            while loop"""
-            return lambda x, recurrent_states, output: x < depth
+    output = forward_output
+    output = tf.nn.bias_add(output, bias)
+    cell_states = tf.nn.local_response_normalization(
+        tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+        depth_radius=num_norm_feat_maps,
+        bias=1,
+        alpha=alpha,
+        beta=beta,
+        name=name + '_lrn'
+    )
 
-        def loop_body(x, recurrent_states, output):
-            """Specifies the body callable of the Tensorflow while loop
+    def termination_cond():
+        """Specifies the termination condition for the Tensorflow
+        while loop"""
+        return lambda x, recurrent_states, output: x < depth
 
-            Args/Returns:
-                x                (tf.Tensor): counter
-                recurrent_states (tf.Tensor): the recurrent states of the
-                                              recurrent convolutional layer
-                output           (tf.Tensor): the output tensor, which is the
-                                              addition of the forward and
-                                              recurrent output and the bias
-            """
-            recurrent_output = tf.nn.conv2d(
-                    recurrent_states,
-                    recurrent_weights,
-                    [1, 1, 1, 1],
-                    padding='SAME')
+    def loop_body(x, recurrent_states, output):
+        """Specifies the body callable of the Tensorflow while loop
 
-            output = tf.add(forward_output, recurrent_output)
-            output += bias
-
-            recurrent_states = tf.nn.local_response_normalization(
-                tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
-                depth_radius=num_norm_feat_maps,
-                bias=1,
-                alpha=alpha,
-                beta=beta,
-                name=name + '_lrn'
-            )
-
-            x += 1
-
-            return x, recurrent_states, output
-
-        # TODO I am not sure why but this learns quicker. Investigate?
-        cond = termination_cond()
-        results = tf.while_loop(
-            cond=cond,
-            body=loop_body,
-            loop_vars=[0, cell_states, output],
-        )
-
-        output = results[2]
-
-        return output
-
-    elif "GPU" in processing_unit.upper():
-        # Use this loop instead of the tensorflow while loop since it causes
-        # trouble running it on the GPU.  When it is used without the optimiser
-        # it is assumed to be never executed, and hence, a dead end.
-        for _ in range(depth):
-            recurrent_output = tf.nn.conv2d(
-                cell_states,
+        Args/Returns:
+            x                (tf.Tensor): counter
+            recurrent_states (tf.Tensor): the recurrent states of the
+                                          recurrent convolutional layer
+            output           (tf.Tensor): the output tensor, which is the
+                                          addition of the forward and
+                                          recurrent output and the bias
+        """
+        recurrent_output = tf.nn.conv2d(
+                recurrent_states,
                 recurrent_weights,
                 [1, 1, 1, 1],
-                padding='SAME'
-            )
+                padding='SAME')
 
-            output = tf.add(forward_output, recurrent_output)
-            output += bias
+        output = tf.add(forward_output, recurrent_output)
+        output = tf.nn.bias_add(output, bias)
 
-            cell_states = tf.nn.local_response_normalization(
-                tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
-                depth_radius=num_norm_feat_maps,
-                bias=1,
-                alpha=alpha,
-                beta=beta,
-                name=name + '_lrn'
-            )
+        recurrent_states = tf.nn.local_response_normalization(
+            tf.maximum(np.asarray(0.0).astype(PRECISION_NP), output),
+            depth_radius=num_norm_feat_maps,
+            bias=1,
+            alpha=alpha,
+            beta=beta,
+            name=name + '_lrn'
+        )
 
-        return output
+        x += 1
 
-    else:
-        raise Exception("Processing unit has to be one of: cpu, gpu.")
+        return x, recurrent_states, output
+
+    # TODO I am not sure why but this learns quicker. Investigate?
+    cond = termination_cond()
+    results = tf.while_loop(
+        cond=cond,
+        body=loop_body,
+        loop_vars=[0, cell_states, output],
+        swap_memory=True,
+        back_prop=True,
+        parallel_iterations=1
+    )
+
+    output = results[2]
+
+    return output
 
 
 def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
-        stddev=.03, stride=[1, 1], padding='same', name='conv'):
+        stride=[1, 1], padding='same', name='conv'):
     """Defines a convolutional layer
 
     Args:
@@ -194,7 +155,6 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
         num_input_chans    (int): the number of input channels
         num_filter         (int): the number of filters
         filter_shape      (list): the shape of the 2D filter
-        stddev           (float): standard deviation
         stride           (List(int)): step size for the filter
         padding            (str): defines whether to fill up the surrounding frame with zeros or not
         name               (str): name to identify the layer
@@ -203,14 +163,11 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
         output       (tf.Tensor): output tensor of the conv layer
     """
     conv_filter_shape = [filter_shape[0], filter_shape[1], num_input_chans,
-            num_filter]
+                         num_filter]
     strides = [1, stride[0], stride[1], 1]
 
-    initializer = tf.contrib.layers.variance_scaling_initializer()
-
     weights = tf.Variable(
-        #tf.truncated_normal(conv_filter_shape, stddev=stddev, dtype=PRECISION_TF),
-        initializer(conv_filter_shape),
+        INITIALIZER(conv_filter_shape),
         trainable=True,
         name=name + '_weights'
     )
@@ -219,7 +176,7 @@ def convolutional_layer(input_data, num_input_chans, num_filter, filter_shape,
         raise ValueError('Padding value is not understood')
 
     output = tf.nn.conv2d(input_data, weights, strides=strides,
-            padding=padding.upper())
+                          padding=padding.upper())
 
     return output
 
@@ -266,15 +223,14 @@ def global_max_pooling_layer(input_data):
     return output
 
 
-def softmax_layer(input_data, num_input_dim, num_output_dim, stddev=.03,
-        name='softmax'):
+def softmax_layer(input_data, num_input_dim, num_output_dim,
+                  name='softmax'):
     """Defines a softmax layer
 
     Args:
         input_data   (tf.Tensor): 4D data tensor
         num_input_dim      (int): the number of input dimensions
         num_output_dim     (int): the number of output dimensions
-        stddev           (float): standard deviation
         name               (str): name to identify the layer
 
     Returns:
@@ -282,18 +238,15 @@ def softmax_layer(input_data, num_input_dim, num_output_dim, stddev=.03,
         linear_trans (tf.Tensor): the linear transformation of the input tensor,
                                   multiplied by the weights plus the bias
     """
-    initializer = tf.contrib.layers.variance_scaling_initializer()
 
     weights = tf.Variable(
-        #tf.truncated_normal([num_input_dim, num_output_dim], stddev=stddev),
-        initializer([num_input_dim, num_output_dim]),
+        INITIALIZER([num_input_dim, num_output_dim]),
         trainable=True,
         name=name + '_weights'
     )
 
     bias = tf.Variable(
-        #tf.truncated_normal([num_output_dim], stddev=stddev),
-        initializer([num_output_dim]),
+        INITIALIZER([num_output_dim]),
         trainable=True,
         name=name + '_bias'
     )
@@ -309,7 +262,7 @@ def accuracy(labels, result):
 
     Args:
         labels  (tf.Tensor): the true labels
-        results (tf.Tensor): the predicted labels
+        result (tf.Tensor): the predicted labels
 
     Returns:
         acc     (tf.Tensor): the accuracy of the classifier
@@ -343,6 +296,7 @@ class RCNN:
             learning_rate=.1,
             num_filter=64,
             shuf_buf_size=10000,
+            recurrent_depth=3,
             conv_filter_shape=[5, 5],
             rconv_filter_shape=[3, 3],
             pool_shape=[3, 3],
@@ -355,9 +309,12 @@ class RCNN:
 
         # Processing unit placeholder
         self.processing_unit = processing_unit
+        self.init_learning_rate = learning_rate
 
         # Dropout probability placeholder
         self.rate_placeholder = tf.placeholder(PRECISION_TF)
+        # Adaptive learning rate placeholder
+        self.adaptive_learning_rate_placeholder = tf.placeholder(PRECISION_TF)
 
         # Number of data placeholder
         self.num_data_placeholder = tf.placeholder(tf.int64)
@@ -409,10 +366,10 @@ class RCNN:
             rcl_layer_1 = rcl(
                 input_data=pooling_1,
                 num_input_chans=num_filter,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_1'
             )
 
@@ -426,11 +383,11 @@ class RCNN:
             # Second recurrent convolutional layer
             rcl_layer_2 = rcl(
                 input_data=dropout_1,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_2'
             )
 
@@ -451,11 +408,11 @@ class RCNN:
             # Third recurrent convolutional layer
             rcl_layer_3 = rcl(
                 input_data=dropout_2,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_3'
             )
 
@@ -469,11 +426,11 @@ class RCNN:
             # Fourth recurrent convolutional layer
             rcl_layer_4 = rcl(
                 input_data=dropout_3,
-                num_of_data=self.num_data_placeholder,
                 processing_unit=self.processing_unit,
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
+                depth=recurrent_depth,
                 name='rcl_layer_4'
             )
 
@@ -498,9 +455,10 @@ class RCNN:
                 )
             )
 
-            # AdagradOptimizer
-            self.optimiser = tf.train.AdagradOptimizer(learning_rate=learning_rate
-                ).minimize(self.cross_entropy)
+            # Gradient Descent Optimizer
+            self.optimiser = tf.train.GradientDescentOptimizer(
+                learning_rate=self.adaptive_learning_rate_placeholder
+            ).minimize(self.cross_entropy)
 
             # Accuracy
             self.accuracy = accuracy(
@@ -515,21 +473,29 @@ class RCNN:
         self.local_init_op = tf.local_variables_initializer()
 
     def train(self, train_data_feats, train_data_labels, val_data_feats,
-            val_data_labels, batch_size=100, epochs=7, create_graph=True,
-            print_vars=True):
+              val_data_labels, batch_size=100, epochs=7, dropout_rate=0.2,
+              adaptive_learning_factor=.1, performance_update_threshold=3,
+              min_difference_accuracy=.1, create_graph=True, print_vars=True):
         """Trains the neural network
 
         Args:
-            train_data_feats  (np.ndarray): features of the training set
-            train_data_labels (np.ndarray): lables of the training set
-            val_data_feats    (np.ndarray): features of the validation set
-            val_data_lables   (np.ndarray): labels of the validation set
-            batch_size               (int): the size of a training batch
-            epochs                   (int): number of training epochs
-            create_graph            (bool): decides whether the network graph
-                                            is computed
-            print_vars              (bool): decides whether information about
-                                            variables is printed
+            train_data_feats       (np.ndarray): features of the training set
+            train_data_labels      (np.ndarray): lables of the training set
+            val_data_feats         (np.ndarray): features of the validation set
+            val_data_labels        (np.ndarray): labels of the validation set
+            batch_size                    (int): the size of a training batch
+            epochs                        (int): number of training epochs
+            dropout_rate                (float): The probability that each element of is discarded
+            create_graph                 (bool): decides whether the network graph
+                                                 is computed
+            adaptive_learning_factor    (float): factor multiplied by the learning rate
+                                                 if performance criterion is not satisfied
+            performance_update_threshold  (int): How often the perfomrance does not need to increase
+                                                 before the learning rate is adapted
+            min_difference_accuracy     (float): The minimum difference to say the performance
+                                                 has increased sufficiently
+            print_vars                   (bool): decides whether information about
+                                                 variables is printed
         """
         with tf.Session() as sess:
             if create_graph:
@@ -561,6 +527,10 @@ class RCNN:
                 print "\nTotal number of trainable parameters:", total_parameters, "\n"
 
             total_batch = int(train_data_feats.shape[0] / batch_size)
+            best_performance = 0
+            last_update_of_performance = 0
+            learning_rate = self.init_learning_rate
+
             for epoch in range(epochs):
                 avg_cost = 0
                 sess.run(self.train_init_op, feed_dict={
@@ -572,11 +542,14 @@ class RCNN:
                     progress = (i / float(total_batch - 1)) * 100
                     print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
+                    if last_update_of_performance >= performance_update_threshold:
+                        learning_rate *= learning_rate * adaptive_learning_factor
+
                     accuracies, _, cost_ = sess.run(
                         [self.summaries, self.optimiser, self.cross_entropy],
                         feed_dict={
-                            self.rate_placeholder: 0.2,
-                            self.num_data_placeholder: batch_size,
+                            self.rate_placeholder: dropout_rate,
+                            self.adaptive_learning_rate_placeholder: learning_rate
                         }
                     )
 
@@ -592,10 +565,15 @@ class RCNN:
                 val_acc, accuracies = sess.run(
                     [self.accuracy, self.summaries],
                     feed_dict={
-                        self.rate_placeholder: 0,
-                        self.num_data_placeholder: val_data_feats.shape[0]
+                        self.rate_placeholder: 0
                     }
                 )
+
+                if val_acc - best_performance > min_difference_accuracy:
+                    best_performance = val_acc
+                    last_update_of_performance = 0
+                else:
+                    last_update_of_performance += 1
 
                 test_writer.add_summary(accuracies)
 

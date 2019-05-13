@@ -16,7 +16,16 @@ if 'DATA_DIRECTORY' in environ:
     DATA_DIR = environ['DATA_DIRECTORY']
 
 
-def preprocess_cifar_imgs_(data):
+def to_greyscale(data, dtype):
+    # luma coding weighted average in video systems
+    r, g, b = np.asarray(.3, dtype=dtype), np.asarray(.59, dtype=dtype), np.asarray(.11, dtype=dtype)
+    rst = r * data[:, :, :, 0] + g * data[:, :, :, 1] + b * data[:, :, :, 2]
+    # add channel dimension
+    rst = np.expand_dims(rst, axis=3)
+    return rst
+
+
+def preprocess_cifar_imgs_(data, dtype, use_grayscale=True):
     """Preprocesses the images in the cifar10 or cifar100 dataset
 
     Args:
@@ -25,17 +34,20 @@ def preprocess_cifar_imgs_(data):
     Returns:
         data (np.ndarray): preprocessed data array
     """
+
     batch_size = data.shape[0]
     R = data[:, 0:1024] / 255.
     G = data[:, 1024:2048] / 255.
     B = data[:, 2048:] / 255.
-
     data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
+
+    if use_grayscale:
+        data = to_greyscale(data, dtype)
 
     return data
 
 
-def data_loader(dataset, file_name, dtype):
+def data_loader(dataset, file_name, dtype, use_grayscale=False):
     """Loads a dataset and preprocesses it
 
     Args:
@@ -49,6 +61,8 @@ def data_loader(dataset, file_name, dtype):
         data (np.ndarray): data matrix (D, N)
         labels (np.ndarray): labels matrix
     """
+    data = None
+    labels = None
     if dataset == "mnist":
         with open(DATA_DIR + '/mnist/' + 'mnist-' +
                 file_name + '-images.gz', 'rb') as fo:
@@ -65,7 +79,10 @@ def data_loader(dataset, file_name, dtype):
         with open(str(DATA_DIR + '/cifar-10-batches-py/' + file_name), 'rb') as fo:
             data_dict = cPickle.load(fo)
 
-        data = preprocess_cifar_imgs_(np.asarray(data_dict['data'], dtype=dtype))
+        data = preprocess_cifar_imgs_(np.asarray(data_dict['data'], dtype=dtype),
+                                      dtype=dtype,
+                                      use_grayscale=use_grayscale
+                                      )
         labels = to_categorical(np.asarray(data_dict['labels'], dtype=dtype),
                 num_classes=10)
 
@@ -73,9 +90,11 @@ def data_loader(dataset, file_name, dtype):
         with open(str(DATA_DIR + '/cifar-100-python/' + file_name), 'rb') as fo:
             data_dict = cPickle.load(fo)
 
-        data = preprocess_cifar_imgs_(np.asarray(data_dict['data'], dtype=dtype))
+        data = preprocess_cifar_imgs_(np.asarray(data_dict['data'], dtype=dtype),
+                                      dtype=dtype,
+                                      use_grayscale=use_grayscale
+                                      )
         labels = to_categorical(np.asarray(data_dict['fine_labels'], dtype=dtype),
                 num_classes=100)
 
     return data, labels
-
