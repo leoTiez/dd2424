@@ -376,7 +376,6 @@ class RCNN:
                 name='rcl_layer_1'
             )
 
-
             # First dropout layer
             dropout_1 = tf.nn.dropout(
                 rcl_layer_1,
@@ -477,9 +476,9 @@ class RCNN:
         self.local_init_op = tf.local_variables_initializer()
 
     def train(self, train_data_feats, train_data_labels, val_data_feats,
-              val_data_labels, batch_size=100, epochs=7, create_graph=True,
+              val_data_labels, batch_size=100, epochs=7, dropout_rate=0.2,
               adaptive_learning_factor=.1, performance_update_threshold=3,
-              min_difference_accuracy=.1, print_vars=True):
+              min_difference_accuracy=.1, create_graph=True, print_vars=True):
         """Trains the neural network
 
         Args:
@@ -489,6 +488,7 @@ class RCNN:
             val_data_labels        (np.ndarray): labels of the validation set
             batch_size                    (int): the size of a training batch
             epochs                        (int): number of training epochs
+            dropout_rate                (float): The probability that each element of is discarded
             create_graph                 (bool): decides whether the network graph
                                                  is computed
             adaptive_learning_factor    (float): factor multiplied by the learning rate
@@ -551,7 +551,7 @@ class RCNN:
                     accuracies, _, cost_ = sess.run(
                         [self.summaries, self.optimiser, self.cross_entropy],
                         feed_dict={
-                            self.rate_placeholder: 0.2,
+                            self.rate_placeholder: dropout_rate,
                             self.adaptive_learning_rate_placeholder: learning_rate
                         }
                     )
