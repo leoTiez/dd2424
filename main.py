@@ -19,8 +19,8 @@ def main(argv):
         input_shape_ = [None, 28, 28, 1]
         output_shape_ = [None, 10]
         learning_rate_ = .001
-        epochs_ = 20
-        batch_size_ = 64
+        epochs_ = 50
+        batch_size_ = 1
         num_filter_ = 64
         buffer_size_ = 10000
         recurrent_depth_ = 3
