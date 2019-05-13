@@ -1,123 +1,100 @@
-from tensorflow.contrib.learn.python.learn.datasets.mnist import extract_images, extract_labels
+#!/usr/bin/python2
+
+"""load_data.py: Load and preprocess datasets"""
+
+__author__ = "Adrian Chmielewski-Anders, Leo Zeitler & Bas Straathof"
+
+from tensorflow.contrib.learn.python.learn.datasets.mnist import \
+        extract_images, extract_labels
 from tensorflow.python.keras.utils import to_categorical
 import cPickle
 import numpy as np
-from os import environ, path, listdir
-import tensorflow as tf
-import csv
+from os import environ
 
 DATA_DIR = './data'
 if 'DATA_DIRECTORY' in environ:
     DATA_DIR = environ['DATA_DIRECTORY']
 
 
-def load_mnist(file_name, dtype, file_path=DATA_DIR + '/mnist/'):
-    data_dict = {}
-    with open(file_path + 'mnist-' + file_name + '-images.gz', 'rb') as fo:
-        data_dict['data'] = np.asarray(extract_images(fo), dtype=dtype)
-    with open(file_path + 'mnist-' + file_name + '-labels.gz', 'rb') as fo:
-        data_dict['labels'] = np.asarray(extract_labels(fo), dtype=dtype)
-
-    return data_dict
-
-
-def preprocess_mnist_data(mnist_data, mnist_labels, dtype):
-    # mean = np.mean(mnist_data, axis=0)
-    # std = np.std(mnist_data, axis=0)
-
-    # return (mnist_data - mean) / (std + np.finfo(dtype).eps), to_categorical(mnist_labels, num_classes=10)
-    return mnist_data / 255., to_categorical(mnist_labels, num_classes=10)
+def to_greyscale(data, dtype):
+    # luma coding weighted average in video systems
+    r, g, b = np.asarray(.3, dtype=dtype), np.asarray(.59, dtype=dtype), np.asarray(.11, dtype=dtype)
+    rst = r * data[:, :, :, 0] + g * data[:, :, :, 1] + b * data[:, :, :, 2]
+    # add channel dimension
+    rst = np.expand_dims(rst, axis=3)
+    return rst
 
 
-def load_cifar(file_name, dtype, file_path=DATA_DIR + '/cifar-10-batches-py/'):
+def preprocess_cifar_imgs_(data, dtype, use_grayscale=True):
+    """Preprocesses the images in the cifar10 or cifar100 dataset
+
+    Args:
+        data (np.ndarray): data array
+
+    Returns:
+        data (np.ndarray): preprocessed data array
     """
-    Loads the cifar data file
-    :param file_name: name of the file
-    :param file_path: path to the cifar data file
-    :return: The cifar data as a dictionary
+
+    batch_size = data.shape[0]
+    R = data[:, 0:1024] / 255.
+    G = data[:, 1024:2048] / 255.
+    B = data[:, 2048:] / 255.
+    data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
+
+    if use_grayscale:
+        data = to_greyscale(data, dtype)
+
+    return data
+
+
+def data_loader(dataset, file_name, dtype, use_grayscale=False):
+    """Loads a dataset and preprocesses it
+
+    Args:
+        dataset (str): identifier of the dataset to be used; for now,
+                       this can be either one of 'mnist', 'cifar10' or
+                       'cifar100'.
+        file_name (str): filename of the data batch to be loaded
+        dtype (type): the datatype precision to be used
+
+    Returns:
+        data (np.ndarray): data matrix (D, N)
+        labels (np.ndarray): labels matrix
     """
-    with open(str(file_path + file_name), 'rb') as fo:
-        data_dict = cPickle.load(fo)
-    data_dict['data'] = np.asarray(data_dict['data'], dtype=dtype)
-    data_dict['labels'] = np.asarray(data_dict['labels'], dtype=dtype)
-    return data_dict
+    data = None
+    labels = None
+    if dataset == "mnist":
+        with open(DATA_DIR + '/mnist/' + 'mnist-' +
+                file_name + '-images.gz', 'rb') as fo:
+            data = np.asarray(extract_images(fo), dtype=dtype) / 255.
 
+        with open(DATA_DIR + '/mnist/' + 'mnist-' + file_name +
+                '-labels.gz', 'rb') as fo:
+            labels = to_categorical(
+                np.asarray(extract_labels(fo), dtype=dtype),
+                num_classes=10
+            )
 
-def preprocess_cifar_data(cifar_data, cifar_labels, dtype):
-    mean = np.mean(cifar_data, axis=0)
-    std = np.std(cifar_data, axis=0)
-    batch_size = cifar_data.shape[0]
+    elif dataset == "cifar10":
+        with open(str(DATA_DIR + '/cifar-10-batches-py/' + file_name), 'rb') as fo:
+            data_dict = cPickle.load(fo)
 
-    # cifar_data = (cifar_data - mean) / (std - np.finfo(dtype).eps)
+        data = preprocess_cifar_imgs_(np.asarray(data_dict['data'], dtype=dtype),
+                                      dtype=dtype,
+                                      use_grayscale=use_grayscale
+                                      )
+        labels = to_categorical(np.asarray(data_dict['labels'], dtype=dtype),
+                num_classes=10)
 
-    R = cifar_data[:, 0:1024] / 255.
-    G = cifar_data[:, 1024:2048] / 255.
-    B = cifar_data[:, 2048:] / 255.
+    elif dataset == "cifar100":
+        with open(str(DATA_DIR + '/cifar-100-python/' + file_name), 'rb') as fo:
+            data_dict = cPickle.load(fo)
 
-    cifar_data = np.dstack((R, G, B)).reshape((batch_size, 32, 32, 3))
+        data = preprocess_cifar_imgs_(np.asarray(data_dict['data'], dtype=dtype),
+                                      dtype=dtype,
+                                      use_grayscale=use_grayscale
+                                      )
+        labels = to_categorical(np.asarray(data_dict['fine_labels'], dtype=dtype),
+                num_classes=100)
 
-    return cifar_data, to_categorical(cifar_labels, num_classes=10)
-
-
-def _tinynet_parse_ims(filename, label):
-    image_string = tf.read_file(filename)
-    im = tf.image.decode_jpeg(image_string, channels=3)
-    im = tf.dtypes.cast(im, tf.float32)
-    im /= 255.0
-    return im, label
-
-
-def _tinynet_build_id_map(file_path):
-    ids = sorted(open(path.join(file_path, 'wnids.txt')).read().splitlines())
-    return {ids[i]: i for i in range(len(ids))}
-
-
-def _tinynet_build_val_map(val_file, id_map):
-    val_map = {}
-    with open(val_file) as annotations:
-        reader = csv.reader(annotations, delimiter='\t')
-        for row in reader:
-            # so will be filename => id
-            val_map[row[0]] = id_map[row[1]]
-    return val_map
-
-
-TINYNET_DIR = '/tinynet/'
-
-
-def load_tinynet_train(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
-    id_map = _tinynet_build_id_map(file_path)
-    im_locs = []
-    im_labels = []
-
-    for anId in id_map:
-        im_dir = path.join(file_path, 'train', anId, 'images')
-        # all the file names
-        im_files = listdir(im_dir)
-        im_locs += [path.join(im_dir, f) for f in im_files]
-        im_labels += [id_map[anId]] * len(im_files)
-
-    fnames = tf.constant(im_locs)
-    labels = tf.constant(im_labels)
-
-    dataset = tf.data.Dataset.from_tensor_slices((fnames, labels))
-    return dataset.map(_tinynet_parse_ims)
-
-
-def load_tinynet_test(dtype=None, file_path=DATA_DIR + TINYNET_DIR):
-    id_map = _tinynet_build_id_map(file_path)
-    val_map = _tinynet_build_val_map(
-        path.join(file_path, 'val/val_annotations.txt'), id_map
-    )
-
-    fpaths = []
-    ids = []
-    for f in val_map:
-        fpaths.append(path.join(file_path, 'val/images', f))
-        ids.append(val_map[f])
-
-    vpaths = tf.constant(fpaths)
-    vlabels = tf.constant(ids)
-    dataset = tf.data.Dataset.from_tensor_slices((vpaths, vlabels))
-
-    return dataset.map(_tinynet_parse_ims)
+    return data, labels
