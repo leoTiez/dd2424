@@ -28,6 +28,7 @@ def main(argv):
     if do_grid_search:
         train_data_length_ = 2000
         test_data_length_ = 500
+        np.random.seed(12345)
 
     dataset_name_ = argv[2]
     if dataset_name_.upper() == "MNIST":
@@ -89,7 +90,7 @@ def main(argv):
                 "data_batch_" + str(i),
                 dtype=RCNN_tf.PRECISION_NP,
                 use_grayscale=use_grayscale,
-                data_length=train_data_length_
+                data_length=int(train_data_length_ / 5)
             )
 
             training_data_ = np.concatenate((training_data_,
