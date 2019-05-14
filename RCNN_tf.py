@@ -561,7 +561,7 @@ class RCNN:
                     )
 
                     avg_cost += cost_ / total_batch
-                    train_writer.add_summary(accuracies)
+                    train_writer.add_summary(accuracies, epoch * total_batch + i)
 
                 sess.run(self.test_init_op, feed_dict={
                     self.input_placeholder: val_data_feats,
@@ -582,7 +582,7 @@ class RCNN:
                 else:
                     last_update_of_performance += 1
 
-                test_writer.add_summary(accuracies)
+                test_writer.add_summary(accuracies, (epoch+1) * total_batch)
 
                 print "\nEpoch:", (epoch + 1), \
                     "cost =", "{:.3f}".format(avg_cost), \
