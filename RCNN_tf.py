@@ -475,7 +475,7 @@ class RCNN:
     def train(self, train_data_feats, train_data_labels, val_data_feats,
               val_data_labels, batch_size=100, epochs=7, dropout_rate=0.2,
               adaptive_learning_factor=.1, performance_update_threshold=3,
-              min_difference_accuracy=.1, create_graph=True, print_vars=True):
+              min_difference_accuracy=.005, create_graph=True, print_vars=True):
         """Trains the neural network
 
         Args:

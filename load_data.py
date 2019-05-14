@@ -47,7 +47,7 @@ def preprocess_cifar_imgs_(data, dtype, use_grayscale=True):
     return data
 
 
-def data_loader(dataset, file_name, dtype, use_grayscale=False):
+def data_loader(dataset, file_name, dtype, use_grayscale=False, data_length=None):
     """Loads a dataset and preprocesses it
 
     Args:
@@ -97,4 +97,7 @@ def data_loader(dataset, file_name, dtype, use_grayscale=False):
         labels = to_categorical(np.asarray(data_dict['fine_labels'], dtype=dtype),
                 num_classes=100)
 
-    return data, labels
+    if data_length is None:
+        return data, labels
+    else:
+        return np.random.shuffle(data)[:data_length], np.random.shuffle(labels)[:data_length]

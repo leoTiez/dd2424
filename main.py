@@ -18,23 +18,27 @@ def main(argv):
         # Setting the parameters
         input_shape_ = [None, 28, 28, 1]
         output_shape_ = [None, 10]
-        learning_rate_ = .001
+        learning_rate_ = .0005
         epochs_ = 50
         batch_size_ = 1
         num_filter_ = 64
         buffer_size_ = 10000
         recurrent_depth_ = 3
+        train_data_length_ = None
+        test_data_length_ = None
 
         training_data_, training_labels_ = data_loader(
             "mnist",
             "train",
-            dtype=RCNN_tf.PRECISION_NP
+            dtype=RCNN_tf.PRECISION_NP,
+            data_length=train_data_length_
         )
 
         test_data_, test_labels_ = data_loader(
             "mnist",
             "test",
-            dtype=RCNN_tf.PRECISION_NP
+            dtype=RCNN_tf.PRECISION_NP,
+            data_length=test_data_length_
         )
 
     elif dataset_name_.upper() == "CIFAR10":
@@ -52,6 +56,8 @@ def main(argv):
         num_filter_ = 96
         buffer_size_ = 10000
         recurrent_depth_ = 3
+        train_data_length_ = None
+        test_data_length_ = None
 
         if not use_grayscale:
             training_data_ = np.empty((0, 32, 32, 3))
@@ -64,7 +70,8 @@ def main(argv):
                 "cifar10",
                 "data_batch_" + str(i),
                 dtype=RCNN_tf.PRECISION_NP,
-                use_grayscale=use_grayscale
+                use_grayscale=use_grayscale,
+                data_length=train_data_length_
             )
 
             training_data_ = np.concatenate((training_data_,
@@ -76,7 +83,8 @@ def main(argv):
             "cifar10",
             "test_batch",
             dtype=RCNN_tf.PRECISION_NP,
-            use_grayscale=use_grayscale
+            use_grayscale=use_grayscale,
+            data_length=test_data_length_
         )
 
     elif dataset_name_.upper() == "CIFAR100":
@@ -94,19 +102,23 @@ def main(argv):
         num_filter_ = 96
         buffer_size_ = 10000
         recurrent_depth_ = 3
+        train_data_length_ = None
+        test_data_length_ = None
 
         training_data_, training_labels_ = data_loader(
             "cifar100",
             "train",
             dtype=RCNN_tf.PRECISION_NP,
-            use_grayscale=use_grayscale
+            use_grayscale=use_grayscale,
+            data_length=train_data_length_
         )
 
         test_data_, test_labels_ = data_loader(
             "cifar100",
             "test",
             dtype=RCNN_tf.PRECISION_NP,
-            use_grayscale=use_grayscale
+            use_grayscale=use_grayscale,
+            data_length=test_data_length_
         )
 
     else:
