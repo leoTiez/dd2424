@@ -18,7 +18,7 @@ def main(argv):
         # Setting the parameters
         input_shape_ = [None, 28, 28, 1]
         output_shape_ = [None, 10]
-        learning_rate_ = .001
+        learning_rate_ = .0005
         epochs_ = 50
         batch_size_ = 1
         num_filter_ = 64
