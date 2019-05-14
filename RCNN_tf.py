@@ -542,7 +542,7 @@ class RCNN:
                     print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
                     if last_update_of_performance >= performance_update_threshold:
-                        learning_rate *= learning_rate * adaptive_learning_factor
+                        learning_rate *= adaptive_learning_factor
 
                     accuracies, _, cost_ = sess.run(
                         [self.summaries, self.optimiser, self.cross_entropy],
