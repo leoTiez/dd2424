@@ -179,7 +179,7 @@ def main(argv):
     else:
         fname = 'accuracies-{}.txt'.format(dataset_name_, 'w+')
         if path.isfile(fname):
-            raise Exception('{} already exists. Do not want to overwrite. Exiting')
+            raise Exception('{} already exists. Do not want to overwrite. Exiting'.format(fname))
         accuracies = open(fname, 'w+')
         epochs_ = 6
         for recurrent_depth_ in [0, 3, 6]:
