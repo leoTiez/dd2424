@@ -9,6 +9,7 @@ from tensorflow.contrib.learn.python.learn.datasets.mnist import \
 from tensorflow.python.keras.utils import to_categorical
 import cPickle
 import numpy as np
+import random
 from os import environ
 
 DATA_DIR = './data'
@@ -100,4 +101,7 @@ def data_loader(dataset, file_name, dtype, use_grayscale=False, data_length=None
     if data_length is None:
         return data, labels
     else:
-        return np.random.shuffle(data)[:data_length], np.random.shuffle(labels)[:data_length]
+        data_zip = list(zip(data, labels))
+        random.shuffle(data_zip)
+        data, labels = zip(*data_zip)
+        return np.asarray(data)[:data_length], np.asarray(labels)[:data_length]
