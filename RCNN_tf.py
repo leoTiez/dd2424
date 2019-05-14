@@ -537,12 +537,13 @@ class RCNN:
                     self.output_placeholder: train_data_labels,
                     self.num_data_placeholder: batch_size
                 })
+
+                if last_update_of_performance >= performance_update_threshold:
+                    learning_rate *= adaptive_learning_factor
+
                 for i in range(total_batch):
                     progress = (i / float(total_batch - 1)) * 100
                     print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
-
-                    if last_update_of_performance >= performance_update_threshold:
-                        learning_rate *= learning_rate * adaptive_learning_factor
 
                     accuracies, _, cost_ = sess.run(
                         [self.summaries, self.optimiser, self.cross_entropy],
