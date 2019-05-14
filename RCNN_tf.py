@@ -473,16 +473,19 @@ class RCNN:
         self.local_init_op = tf.local_variables_initializer()
 
     def train(self, train_data_feats, train_data_labels, val_data_feats,
-              val_data_labels, batch_size=100, epochs=7, dropout_rate=0.2,
+              test_data_feats, test_data_labels, val_data_labels,
+              batch_size=100, epochs=7, dropout_rate=0.2,
               adaptive_learning_factor=.1, performance_update_threshold=3,
               min_difference_accuracy=.005, create_graph=True, print_vars=True):
         """Trains the neural network
 
         Args:
             train_data_feats       (np.ndarray): features of the training set
-            train_data_labels      (np.ndarray): lables of the training set
+            train_data_labels      (np.ndarray): labels of the training set
             val_data_feats         (np.ndarray): features of the validation set
             val_data_labels        (np.ndarray): labels of the validation set
+            test_data_feats        (np.ndarray): features of the test data
+            test_data_labels       (np.ndarray): labels of the test data
             batch_size                    (int): the size of a training batch
             epochs                        (int): number of training epochs
             dropout_rate                (float): The probability that each element of is discarded
@@ -579,7 +582,21 @@ class RCNN:
 
                 print "\nEpoch:", (epoch + 1), \
                     "cost =", "{:.3f}".format(avg_cost), \
-                    "test accuracy: {:.3f}".format(val_acc)
+                    "validation accuracy: {:.3f}".format(val_acc)
+
+            sess.run(self.test_init_op, feed_dict={
+                self.input_placeholder: test_data_feats,
+                self.output_placeholder: test_data_labels,
+                self.num_data_placeholder: test_data_feats.shape[0]
+            })
+
+            test_acc, accuracies = sess.run(
+                [self.accuracy, self.summaries],
+                feed_dict={
+                    self.rate_placeholder: 0
+                }
+            )
+            print "\nFinal test accuracy: {:.3f}".format(test_acc)
 
         test_writer.close()
         train_writer.close()

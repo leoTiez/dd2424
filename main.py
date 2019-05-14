@@ -3,6 +3,8 @@ import RCNN_tf
 from load_data import data_loader
 import numpy as np
 
+VAL_SET_PERCENT_LEN = 10
+
 
 def main(argv):
     processing_unit_ = argv[1]
@@ -33,6 +35,12 @@ def main(argv):
             dtype=RCNN_tf.PRECISION_NP,
             data_length=train_data_length_
         )
+
+        val_data_ = training_data_[-training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_label_ = training_labels_[-training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
+
+        training_data_ = training_data_[:-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_labels_ = training_labels_[:-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
 
         test_data_, test_labels_ = data_loader(
             "mnist",
@@ -79,6 +87,12 @@ def main(argv):
             training_labels_ = np.concatenate((training_labels_,
                                                training_labels_batch_))
 
+        val_data_ = training_data_[-training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_label_ = training_labels_[-training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
+
+        training_data_ = training_data_[:-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_labels_ = training_labels_[:-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
+
         test_data_, test_labels_ = data_loader(
             "cifar10",
             "test_batch",
@@ -113,6 +127,12 @@ def main(argv):
             data_length=train_data_length_
         )
 
+        val_data_ = training_data_[-training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_label_ = training_labels_[-training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
+
+        training_data_ = training_data_[:-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_labels_ = training_labels_[:-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
+
         test_data_, test_labels_ = data_loader(
             "cifar100",
             "test",
@@ -137,8 +157,10 @@ def main(argv):
     rcnn.train(
         train_data_feats=training_data_,
         train_data_labels=training_labels_,
-        val_data_feats=test_data_,
-        val_data_labels=test_labels_,
+        val_data_feats=val_data_,
+        val_data_labels=val_label_,
+        test_data_feats=test_data_,
+        test_data_labels=test_labels_,
         batch_size=batch_size_,
         epochs=epochs_,
         create_graph=False,
