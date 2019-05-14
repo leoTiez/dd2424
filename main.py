@@ -200,13 +200,16 @@ def main(argv):
                 )
 
                 if recurrent_depth_ == 0:
-                    num_filter_ = 128
+                    num_filter_test_ = 128
+                else:
+                    num_filter_test_ = num_filter_
+
                 rcnn = RCNN_tf.RCNN(
                     input_shape=input_shape_,
                     output_shape=output_shape_,
                     processing_unit=processing_unit_,
                     learning_rate=learning_rate_,
-                    num_filter=num_filter_,
+                    num_filter=num_filter_test_,
                     shuf_buf_size=buffer_size_,
                     recurrent_depth=recurrent_depth_
                 )
