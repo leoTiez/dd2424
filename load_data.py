@@ -48,15 +48,17 @@ def preprocess_cifar_imgs_(data, dtype, use_grayscale=True):
     return data
 
 
-def data_loader(dataset, file_name, dtype, use_grayscale=False, data_length=None):
+def data_loader(dataset, file_name, dtype, use_grayscale=False,
+        data_length=None, coarse=False):
     """Loads a dataset and preprocesses it
 
     Args:
-        dataset (str): identifier of the dataset to be used; for now,
-                       this can be either one of 'mnist', 'cifar10' or
-                       'cifar100'.
+        dataset   (str): identifier of the dataset to be used; for now,
+                         this can be either one of 'mnist', 'cifar10' or
+                         'cifar100'.
         file_name (str): filename of the data batch to be loaded
-        dtype (type): the datatype precision to be used
+        dtype    (type): the datatype precision to be used
+        coarse   (bool): used to speicify coarse labelling of CIFAR100
 
     Returns:
         data (np.ndarray): data matrix (D, N)
@@ -95,8 +97,12 @@ def data_loader(dataset, file_name, dtype, use_grayscale=False, data_length=None
                                       dtype=dtype,
                                       use_grayscale=use_grayscale
                                       )
-        labels = to_categorical(np.asarray(data_dict['fine_labels'], dtype=dtype),
-                num_classes=100)
+        if bool(coarse):
+            labels = to_categorical(np.asarray(data_dict['coarse_labels'], dtype=dtype),
+                    num_classes=20)
+        else:
+            labels = to_categorical(np.asarray(data_dict['fine_labels'], dtype=dtype),
+                    num_classes=100)
 
     if data_length is None:
         return data, labels

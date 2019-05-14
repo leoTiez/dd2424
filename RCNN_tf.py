@@ -476,7 +476,8 @@ class RCNN:
               test_data_feats, test_data_labels, val_data_labels,
               batch_size=100, epochs=7, dropout_rate=0.2,
               adaptive_learning_factor=.1, performance_update_threshold=3,
-              min_difference_accuracy=.005, create_graph=True, print_vars=True):
+              min_difference_accuracy=.005, create_graph=True, print_vars=True,
+              dir_name=''):
         """Trains the neural network
 
         Args:
@@ -499,14 +500,17 @@ class RCNN:
                                                  has increased sufficiently
             print_vars                   (bool): decides whether information about
                                                  variables is printed
+            dir_name                      (str): prefix for the directory where the logs
+                                                 will be written
         """
+        log_dir = 'logs/{}'.format(dir_name)
         with tf.Session() as sess:
             if create_graph:
-                writer = tf.summary.FileWriter('logs/.')
+                writer = tf.summary.FileWriter(log_dir)
                 writer.add_graph(sess.graph)
 
-            train_writer = tf.summary.FileWriter('logs/train', sess.graph)
-            test_writer = tf.summary.FileWriter('logs/test')
+            train_writer = tf.summary.FileWriter('{}/train'.format(log_dir), sess.graph)
+            test_writer = tf.summary.FileWriter('{}/test'.format(log_dir))
 
             # Initialise the variables
             sess.run(self.global_init_op)
@@ -557,7 +561,7 @@ class RCNN:
                     )
 
                     avg_cost += cost_ / total_batch
-                    train_writer.add_summary(accuracies)
+                    train_writer.add_summary(accuracies, epoch * total_batch + i)
 
                 sess.run(self.test_init_op, feed_dict={
                     self.input_placeholder: val_data_feats,
@@ -578,7 +582,7 @@ class RCNN:
                 else:
                     last_update_of_performance += 1
 
-                test_writer.add_summary(accuracies)
+                test_writer.add_summary(accuracies, (epoch+1) * total_batch)
 
                 print "\nEpoch:", (epoch + 1), \
                     "cost =", "{:.3f}".format(avg_cost), \
@@ -603,5 +607,6 @@ class RCNN:
 
         if create_graph:
             writer.close()
+        return test_acc
 
 
