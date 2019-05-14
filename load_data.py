@@ -100,4 +100,4 @@ def data_loader(dataset, file_name, dtype, use_grayscale=False, data_length=None
     if data_length is None:
         return data, labels
     else:
-        return data[:data_length], labels[:data_length]
+        return np.random.shuffle(data)[:data_length], np.random.shuffle(labels)[:data_length]
