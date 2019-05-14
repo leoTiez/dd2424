@@ -189,7 +189,7 @@ def main(argv):
         if path.isfile(fname):
             raise Exception('{} already exists. Do not want to overwrite. Exiting'.format(fname))
         accuracies = open(fname, 'w+')
-        epochs_ = 6
+        epochs_ = 10
         for recurrent_depth_ in [0, 3, 6]:
             for adaptive_learning_factor in [0.01, 0.1, 1]:
                 tf.reset_default_graph()
