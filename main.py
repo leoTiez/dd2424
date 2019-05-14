@@ -17,10 +17,12 @@ def main(argv):
     else:
         raise ValueError("Device type is not supported. Use either GPU or CPU")
 
+    coarse = False
     do_grid_search = False
-    if len(argv) > 2:
+    if len(argv) > 3:
         if argv[3] == 'grid-search':
             do_grid_search = True
+            coarse = True
 
     train_data_length_ = None
     test_data_length_ = None
@@ -120,7 +122,11 @@ def main(argv):
         else:
             input_shape_ = [None, 32, 32, 1]
 
-        output_shape_ = [None, 100]
+        if coarse:
+            output_shape_ = [None, 20]
+        else:
+            output_shape_ = [None, 100]
+
         learning_rate_ = .0001
         epochs_ = 50
         batch_size_ = 1
@@ -133,7 +139,8 @@ def main(argv):
             "train",
             dtype=RCNN_tf.PRECISION_NP,
             use_grayscale=use_grayscale,
-            data_length=train_data_length_
+            data_length=train_data_length_,
+            coarse=coarse
         )
 
         val_data_ = training_data_[-training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
@@ -147,7 +154,8 @@ def main(argv):
             "test",
             dtype=RCNN_tf.PRECISION_NP,
             use_grayscale=use_grayscale,
-            data_length=test_data_length_
+            data_length=test_data_length_,
+            coarse=coarse
         )
 
     else:
