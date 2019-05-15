@@ -238,7 +238,7 @@ def main(argv):
             create_graph=False,
             print_vars=True,
             adaptive_learning_factor=adaptive_learning_factor,
-            dir_name='{}-depth_{}-learningfactor_{}-batch_{}'.format(
+            dir_name='final-{}-depth_{}-learningfactor_{}-batch_{}'.format(
                 dataset_name_, recurrent_depth_,
                 adaptive_learning_factor, batch_size_)
         )
