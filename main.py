@@ -192,51 +192,55 @@ def main(argv):
         epochs_ = 10
         for recurrent_depth_ in [0, 3, 6]:
             for adaptive_learning_factor in [0.01, 0.1, 1]:
-                tf.reset_default_graph()
-                # as per the paper to set the number of weights to be roughly
-                # the same
-                print 'Training with depth {} and learning factor {}'.format(
-                    recurrent_depth_, adaptive_learning_factor
-                )
-
-                if recurrent_depth_ == 0:
-                    num_filter_test_ = 128
-                else:
-                    num_filter_test_ = num_filter_
-
-                rcnn = RCNN_tf.RCNN(
-                    input_shape=input_shape_,
-                    output_shape=output_shape_,
-                    processing_unit=processing_unit_,
-                    learning_rate=learning_rate_,
-                    num_filter=num_filter_test_,
-                    shuf_buf_size=buffer_size_,
-                    recurrent_depth=recurrent_depth_
-                )
-
-                accuracy = rcnn.train(
-                    train_data_feats=training_data_,
-                    train_data_labels=training_labels_,
-                    val_data_feats=val_data_,
-                    val_data_labels=val_label_,
-                    test_data_feats=test_data_,
-                    test_data_labels=test_labels_,
-                    batch_size=batch_size_,
-                    epochs=epochs_,
-                    create_graph=False,
-                    print_vars=True,
-                    adaptive_learning_factor=adaptive_learning_factor,
-                    dir_name='{}-depth_{}-learningfactor_{}'.format(dataset_name_, recurrent_depth_, adaptive_learning_factor)
-                )
-                print 'accuracy {}'.format(accuracy)
-
-                accuracies.write(
-                    'depth = {}, learningfactor = {}: {}\n'.format(
-                        recurrent_depth_, adaptive_learning_factor, accuracy
+                for batch_size_ in [1, 32, 100]:
+                    tf.reset_default_graph()
+                    # as per the paper to set the number of weights to be roughly
+                    # the same
+                    print 'Training with depth {} and learning factor {}'.format(
+                        recurrent_depth_, adaptive_learning_factor
                     )
-                )
-                # in case we're interrupted we'll save our progress somewhat
-                accuracies.flush()
+
+                    if recurrent_depth_ == 0:
+                        num_filter_test_ = 128
+                    else:
+                        num_filter_test_ = num_filter_
+
+                    # we increase batch size by a factor of k
+                    learning_rate_test = learning_rate_ * np.sqrt(batch_size_)
+
+                    rcnn = RCNN_tf.RCNN(
+                        input_shape=input_shape_,
+                        output_shape=output_shape_,
+                        processing_unit=processing_unit_,
+                        learning_rate=learning_rate_test,
+                        num_filter=num_filter_test_,
+                        shuf_buf_size=buffer_size_,
+                        recurrent_depth=recurrent_depth_
+                    )
+
+                    accuracy = rcnn.train(
+                        train_data_feats=training_data_,
+                        train_data_labels=training_labels_,
+                        val_data_feats=val_data_,
+                        val_data_labels=val_label_,
+                        test_data_feats=test_data_,
+                        test_data_labels=test_labels_,
+                        batch_size=batch_size_,
+                        epochs=epochs_,
+                        create_graph=False,
+                        print_vars=True,
+                        adaptive_learning_factor=adaptive_learning_factor,
+                        dir_name='{}-depth_{}-learningfactor_{}'.format(dataset_name_, recurrent_depth_, adaptive_learning_factor)
+                    )
+                    print 'accuracy {}'.format(accuracy)
+
+                    accuracies.write(
+                        'depth = {}, learningfactor = {}: {}\n'.format(
+                            recurrent_depth_, adaptive_learning_factor, accuracy
+                        )
+                    )
+                    # in case we're interrupted we'll save our progress somewhat
+                    accuracies.flush()
         accuracies.close()
 
 
