@@ -230,13 +230,13 @@ def main(argv):
                         create_graph=False,
                         print_vars=True,
                         adaptive_learning_factor=adaptive_learning_factor,
-                        dir_name='{}-depth_{}-learningfactor_{}'.format(dataset_name_, recurrent_depth_, adaptive_learning_factor)
+                        dir_name='{}-depth_{}-learningfactor_{}-batch_{}'.format(dataset_name_, recurrent_depth_, adaptive_learning_factor, batch_size_)
                     )
                     print 'accuracy {}'.format(accuracy)
 
                     accuracies.write(
-                        'depth = {}, learningfactor = {}: {}\n'.format(
-                            recurrent_depth_, adaptive_learning_factor, accuracy
+                        'depth = {}, learningfactor = {}, batch {}: {}\n'.format(
+                            recurrent_depth_, adaptive_learning_factor, batch_size_, accuracy
                         )
                     )
                     # in case we're interrupted we'll save our progress somewhat
