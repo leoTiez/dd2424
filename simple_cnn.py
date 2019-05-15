@@ -146,23 +146,18 @@ def main(argv):
     else:
         raise Exception("dataset has to be one of 'mnist', 'cifar10' or 'cifar100'.")
 
-    if number_of_runs > 1:
-        test_accs = []
-        for i in range(number_of_runs):
-            test_acc = cnn_model(train_images=train_images_, train_labels=train_labels_,
-                    test_images=test_images_, test_labels=test_labels_,
-                    input_shape=input_shape_, num_classes=num_classes_,
-                    num_epochs=num_epochs_)
-            test_accs.append(test_acc)
-
-        print "Test mean acc:"  + str(np.mean(np.asarray(test_accs)))
-        print "Test stdev acc:" + str(np.std(np.asarray(test_accs)))
-    else:
+    test_accs = []
+    for i in range(number_of_runs):
         test_acc = cnn_model(train_images=train_images_, train_labels=train_labels_,
                 test_images=test_images_, test_labels=test_labels_,
                 input_shape=input_shape_, num_classes=num_classes_,
                 num_epochs=num_epochs_)
-        print "The test accuracy is %.2f %%." % (test_acc*100)
+        test_accs.append(test_acc)
+
+    print "Test mean acc:" + str(np.mean(np.asarray(test_accs))) + \
+            " for %s runs." % number_of_runs
+    print "Test stdev acc:" + str(np.std(np.asarray(test_accs))) + \
+            " for %s runs." % number_of_runs
 
 
 if __name__ == '__main__':
