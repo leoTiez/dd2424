@@ -477,7 +477,7 @@ class RCNN:
               batch_size=100, epochs=7, dropout_rate=0.2,
               adaptive_learning_factor=.1, performance_update_threshold=3,
               min_difference_accuracy=.005, create_graph=True, print_vars=True,
-              dir_name=''):
+              dir_name='', progress_bar=True):
         """Trains the neural network
 
         Args:
@@ -549,8 +549,9 @@ class RCNN:
                     learning_rate *= adaptive_learning_factor
 
                 for i in range(total_batch):
-                    progress = (i / float(total_batch - 1)) * 100
-                    print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
+                    if progress_bar:
+                        progress = (i / float(total_batch - 1)) * 100
+                        print '\r {:.1f}%'.format(progress), '\t{0}> '.format('#' * int(progress)),
 
                     accuracies, _, cost_ = sess.run(
                         [self.summaries, self.optimiser, self.cross_entropy],
