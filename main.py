@@ -4,11 +4,30 @@ from load_data import data_loader
 import numpy as np
 from os import path
 import tensorflow as tf
+from argparse import ArgumentParser
 
 VAL_SET_PERCENT_LEN = 10
 
 
+def parse_train_args(args):
+    parser = ArgumentParser()
+    parser.add_argument('-d', '--depth', type=int)
+    parser.add_argument('-f', '--adaptive-learning-factor', type=float)
+    parser.add_argument('-b', '--batch-size', type=int)
+
+    return parser.parse_args(args)
+
+
+def safe_open(fname):
+    if path.isfile(fname):
+        raise Exception(
+            '{} already exists. Do not want to overwrite. Exiting'.format(
+                fname))
+    return open(fname, 'w+')
+
+
 def main(argv):
+    print argv
     processing_unit_ = argv[1]
     if processing_unit_.upper() == "CPU" or processing_unit_ is None:
         processing_unit_ = "/cpu:0"
@@ -19,10 +38,14 @@ def main(argv):
 
     coarse = False
     do_grid_search = False
+    train_args = None
     if len(argv) > 3:
         if argv[3] == 'grid-search':
             do_grid_search = True
             coarse = True
+        else:
+            train_args = parse_train_args(argv[3:])
+            print train_args
 
     train_data_length_ = None
     test_data_length_ = None
@@ -51,11 +74,15 @@ def main(argv):
             data_length=train_data_length_
         )
 
-        val_data_ = training_data_[-training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
-        val_label_ = training_labels_[-training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_data_ = training_data_[
+                    -training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_label_ = training_labels_[
+                     -training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
 
-        training_data_ = training_data_[:-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
-        training_labels_ = training_labels_[:-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_data_ = training_data_[
+                         :-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_labels_ = training_labels_[
+                           :-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
 
         test_data_, test_labels_ = data_loader(
             "mnist",
@@ -100,11 +127,15 @@ def main(argv):
             training_labels_ = np.concatenate((training_labels_,
                                                training_labels_batch_))
 
-        val_data_ = training_data_[-training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
-        val_label_ = training_labels_[-training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_data_ = training_data_[
+                    -training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_label_ = training_labels_[
+                     -training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
 
-        training_data_ = training_data_[:-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
-        training_labels_ = training_labels_[:-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_data_ = training_data_[
+                         :-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_labels_ = training_labels_[
+                           :-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
 
         test_data_, test_labels_ = data_loader(
             "cifar10",
@@ -143,11 +174,15 @@ def main(argv):
             coarse=coarse
         )
 
-        val_data_ = training_data_[-training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
-        val_label_ = training_labels_[-training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_data_ = training_data_[
+                    -training_data_.shape[0] / VAL_SET_PERCENT_LEN:]
+        val_label_ = training_labels_[
+                     -training_labels_.shape[0] / VAL_SET_PERCENT_LEN:]
 
-        training_data_ = training_data_[:-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
-        training_labels_ = training_labels_[:-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_data_ = training_data_[
+                         :-training_data_.shape[0] / VAL_SET_PERCENT_LEN]
+        training_labels_ = training_labels_[
+                           :-training_labels_.shape[0] / VAL_SET_PERCENT_LEN]
 
         test_data_, test_labels_ = data_loader(
             "cifar100",
@@ -159,20 +194,39 @@ def main(argv):
         )
 
     else:
-        raise Exception("dataset has to be one of 'mnist', 'cifar10' or 'cifar100'.")
+        raise Exception(
+            "dataset has to be one of 'mnist', 'cifar10' or 'cifar100'.")
 
     if not do_grid_search:
+        if train_args:
+            if train_args.depth:
+                recurrent_depth_ = train_args.depth
+            if train_args.adaptive_learning_factor:
+                adaptive_learning_factor = train_args.adaptive_learning_factor
+            if train_args.batch_size:
+                batch_size_ = train_args.batch_size
+
+        if recurrent_depth_ == 0:
+            num_filter_test_ = 128
+        else:
+            num_filter_test_ = num_filter_
+
+        # we increase batch size by a factor of k
+        learning_rate_test = learning_rate_ * np.sqrt(batch_size_)
+
+        print recurrent_depth_, adaptive_learning_factor, batch_size_
+
         rcnn = RCNN_tf.RCNN(
             input_shape=input_shape_,
             output_shape=output_shape_,
             processing_unit=processing_unit_,
-            learning_rate=learning_rate_,
-            num_filter=num_filter_,
+            learning_rate=learning_rate_test,
+            num_filter=num_filter_test_,
             shuf_buf_size=buffer_size_,
             recurrent_depth=recurrent_depth_
         )
 
-        rcnn.train(
+        accuracy = rcnn.train(
             train_data_feats=training_data_,
             train_data_labels=training_labels_,
             val_data_feats=val_data_,
@@ -182,13 +236,28 @@ def main(argv):
             batch_size=batch_size_,
             epochs=epochs_,
             create_graph=False,
-            print_vars=True
+            print_vars=True,
+            adaptive_learning_factor=adaptive_learning_factor,
+            dir_name='final-{}-depth_{}-learningfactor_{}-batch_{}'.format(
+                dataset_name_, recurrent_depth_,
+                adaptive_learning_factor, batch_size_)
         )
+        print 'accuracy {}'.format(accuracy)
+
+        fname = 'final-accuracy-{}.txt'.format(dataset_name_, 'w+')
+        final_accuracy = safe_open(fname)
+
+        final_accuracy.write(
+            'depth = {}, learningfactor = {}, batch {}: {}\n'.format(
+                recurrent_depth_, adaptive_learning_factor,
+                batch_size_, accuracy
+            )
+        )
+        final_accuracy.close()
+
     else:
         fname = 'accuracies-{}.txt'.format(dataset_name_, 'w+')
-        if path.isfile(fname):
-            raise Exception('{} already exists. Do not want to overwrite. Exiting'.format(fname))
-        accuracies = open(fname, 'w+')
+        accuracies = safe_open(fname)
         epochs_ = 10
         for recurrent_depth_ in [0, 3, 6]:
             for adaptive_learning_factor in [0.01, 0.1, 1]:
@@ -230,13 +299,16 @@ def main(argv):
                         create_graph=False,
                         print_vars=True,
                         adaptive_learning_factor=adaptive_learning_factor,
-                        dir_name='{}-depth_{}-learningfactor_{}-batch_{}'.format(dataset_name_, recurrent_depth_, adaptive_learning_factor, batch_size_)
+                        dir_name='{}-depth_{}-learningfactor_{}-batch_{}'.format(
+                            dataset_name_, recurrent_depth_,
+                            adaptive_learning_factor, batch_size_)
                     )
                     print 'accuracy {}'.format(accuracy)
 
                     accuracies.write(
                         'depth = {}, learningfactor = {}, batch {}: {}\n'.format(
-                            recurrent_depth_, adaptive_learning_factor, batch_size_, accuracy
+                            recurrent_depth_, adaptive_learning_factor,
+                            batch_size_, accuracy
                         )
                     )
                     # in case we're interrupted we'll save our progress somewhat
