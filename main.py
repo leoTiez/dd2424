@@ -199,7 +199,7 @@ def main(argv):
 
     if not do_grid_search:
         if train_args:
-            if train_args.depth:
+            if train_args.depth is not None:
                 recurrent_depth_ = train_args.depth
             if train_args.adaptive_learning_factor:
                 adaptive_learning_factor = train_args.adaptive_learning_factor
