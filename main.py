@@ -244,7 +244,7 @@ def main(argv):
         )
         print 'accuracy {}'.format(accuracy)
 
-        fname = 'final-accuracy-{}.txt'.format(dataset_name_, 'w+')
+        fname = 'final-accuracy-{}-{}.txt'.format(dataset_name_, recurrent_depth_, 'w+')
         final_accuracy = safe_open(fname)
 
         final_accuracy.write(
