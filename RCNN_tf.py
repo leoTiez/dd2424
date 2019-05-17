@@ -319,6 +319,8 @@ class RCNN:
         # Number of data placeholder
         self.num_data_placeholder = tf.placeholder(tf.int64)
 
+        self.recurrent_depth = recurrent_depth
+
         # Create data set objects
         training_data_set = tf.data.Dataset.from_tensor_slices((
             self.input_placeholder,
@@ -522,6 +524,10 @@ class RCNN:
                 values = sess.run(variables_names)
                 total_parameters = 0
                 for k, v in zip(variables_names, values):
+                    if self.recurrent_depth == 0:
+                        if "rcl" in str(k[:-2]) and "recurrent" in str(k[:-2]):
+                            continue
+
                     print "Variable: " + k[:-2] + ". Shape: " + str(v.shape)
 
                     variable_parameters = 1
