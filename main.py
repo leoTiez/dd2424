@@ -202,13 +202,13 @@ def main(argv):
 
     if not do_grid_search:
         adaptive_learning_factor = 1
-        learning_depth_ = 3
-        test_depth_ = 3
+        depth_learning_ = 3
+        depth_test_ = 3
         if train_args:
             if train_args.depth_learning is not None:
-                learning_depth_ = train_args.depth_learning
+                depth_learning_ = train_args.depth_learning
             if train_args.depth_test is not None:
-                test_depth_ = train_args.depth_test
+                depth_test_ = train_args.depth_test
             if train_args.adaptive_learning_factor:
                 adaptive_learning_factor = train_args.adaptive_learning_factor
             if train_args.batch_size:
@@ -241,8 +241,8 @@ def main(argv):
             test_data_feats=test_data_,
             test_data_labels=test_labels_,
             batch_size=batch_size_,
-            learning_depth=learning_depth_,
-            test_depth=test_depth_,
+            training_depth=depth_learning_,
+            test_depth=depth_test_,
             epochs=epochs_,
             create_graph=False,
             print_vars=True,
@@ -303,7 +303,7 @@ def main(argv):
                         test_data_feats=test_data_,
                         test_data_labels=test_labels_,
                         batch_size=batch_size_,
-                        learning_depth=recurrent_depth_,
+                        training_depth=recurrent_depth_,
                         test_depth=recurrent_depth_,
                         epochs=epochs_,
                         create_graph=False,
