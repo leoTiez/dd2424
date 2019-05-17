@@ -114,12 +114,14 @@ def main(argv):
 
         training_labels_ = np.empty((0, 10))
         for i in range(1, 6):
+            if train_data_length_ is not None:
+                train_data_length_ = int(train_data_length_ / 5)
             training_data_batch_, training_labels_batch_ = data_loader(
                 "cifar10",
                 "data_batch_" + str(i),
                 dtype=RCNN_tf.PRECISION_NP,
                 use_grayscale=use_grayscale,
-                data_length=int(train_data_length_ / 5)
+                data_length=train_data_length_
             )
 
             training_data_ = np.concatenate((training_data_,
