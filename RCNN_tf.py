@@ -476,7 +476,7 @@ class RCNN:
 
     def train(self, train_data_feats, train_data_labels, val_data_feats,
               test_data_feats, test_data_labels, val_data_labels,
-              learning_depth=3, test_depth=6,
+              training_depth=3, test_depth=6,
               batch_size=100, epochs=7, dropout_rate=0.2,
               adaptive_learning_factor=.1, performance_update_threshold=3,
               min_difference_accuracy=.005, create_graph=True, print_vars=True,
@@ -495,6 +495,8 @@ class RCNN:
             dropout_rate                (float): The probability that each element of is discarded
             create_graph                 (bool): decides whether the network graph
                                                  is computed
+            training_depth                (int): Recurrent depth used while training
+            test_depth                    (int): Recurrent depth used while test
             adaptive_learning_factor    (float): factor multiplied by the learning rate
                                                  if performance criterion is not satisfied
             performance_update_threshold  (int): How often the perfomrance does not need to increase
@@ -525,7 +527,7 @@ class RCNN:
                 values = sess.run(variables_names)
                 total_parameters = 0
                 for k, v in zip(variables_names, values):
-                    if self.recurrent_depth == 0:
+                    if training_depth == 0:
                         if "rcl" in str(k[:-2]) and "recurrent" in str(k[:-2]):
                             continue
 
@@ -549,7 +551,7 @@ class RCNN:
                 sess.run(self.train_init_op, feed_dict={
                     self.input_placeholder: train_data_feats,
                     self.output_placeholder: train_data_labels,
-                    self.num_data_placeholder: batch_size,
+                    self.num_data_placeholder: batch_size
                 })
 
                 if last_update_of_performance >= performance_update_threshold:
@@ -565,7 +567,7 @@ class RCNN:
                         feed_dict={
                             self.rate_placeholder: dropout_rate,
                             self.adaptive_learning_rate_placeholder: learning_rate,
-                            self.recurrent_depth_placeholder: learning_depth
+                            self.recurrent_depth_placeholder: training_depth
                         }
                     )
 
@@ -607,7 +609,8 @@ class RCNN:
             test_acc, accuracies = sess.run(
                 [self.accuracy, self.summaries],
                 feed_dict={
-                    self.rate_placeholder: 0
+                    self.rate_placeholder: 0,
+                    self.recurrent_depth_placeholder: test_depth
                 }
             )
             print "\nFinal test accuracy: {:.3f}".format(test_acc)
