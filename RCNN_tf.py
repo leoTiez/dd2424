@@ -43,7 +43,7 @@ def rcl(input_data, num_input_chans, num_filter, filter_shape,
         name               (str): name to identify the layer
 
     Returns:
-        output       (tf.Tensor): output tensor of the reccurent conv layer
+        output       (tf.Tensor): output tensor of the recurrent conv layer
     """
     # Check whether the right amount of normalization feature maps is passed
     if ("GPU" in processing_unit.upper() and
@@ -296,7 +296,6 @@ class RCNN:
             learning_rate=.1,
             num_filter=64,
             shuf_buf_size=10000,
-            recurrent_depth=3,
             conv_filter_shape=[5, 5],
             rconv_filter_shape=[3, 3],
             pool_shape=[3, 3],
@@ -318,6 +317,9 @@ class RCNN:
 
         # Number of data placeholder
         self.num_data_placeholder = tf.placeholder(tf.int64)
+
+        # Recurrent depth placeholder
+        self.recurrent_depth_placeholder = tf.placeholder(tf.int32)
 
         # Create data set objects
         training_data_set = tf.data.Dataset.from_tensor_slices((
@@ -369,7 +371,7 @@ class RCNN:
                 processing_unit=self.processing_unit,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
-                depth=recurrent_depth,
+                depth=self.recurrent_depth_placeholder,
                 name='rcl_layer_1'
             )
 
@@ -387,7 +389,7 @@ class RCNN:
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
-                depth=recurrent_depth,
+                depth=self.recurrent_depth_placeholder,
                 name='rcl_layer_2'
             )
 
@@ -412,7 +414,7 @@ class RCNN:
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
-                depth=recurrent_depth,
+                depth=self.recurrent_depth_placeholder,
                 name='rcl_layer_3'
             )
 
@@ -430,7 +432,7 @@ class RCNN:
                 num_input_chans=num_filter,
                 filter_shape=rconv_filter_shape,
                 num_filter=num_filter,
-                depth=recurrent_depth,
+                depth=self.recurrent_depth_placeholder,
                 name='rcl_layer_4'
             )
 
@@ -474,6 +476,7 @@ class RCNN:
 
     def train(self, train_data_feats, train_data_labels, val_data_feats,
               test_data_feats, test_data_labels, val_data_labels,
+              learning_depth=3, test_depth=6,
               batch_size=100, epochs=7, dropout_rate=0.2,
               adaptive_learning_factor=.1, performance_update_threshold=3,
               min_difference_accuracy=.005, create_graph=True, print_vars=True,
@@ -542,7 +545,7 @@ class RCNN:
                 sess.run(self.train_init_op, feed_dict={
                     self.input_placeholder: train_data_feats,
                     self.output_placeholder: train_data_labels,
-                    self.num_data_placeholder: batch_size
+                    self.num_data_placeholder: batch_size,
                 })
 
                 if last_update_of_performance >= performance_update_threshold:
@@ -557,7 +560,8 @@ class RCNN:
                         [self.summaries, self.optimiser, self.cross_entropy],
                         feed_dict={
                             self.rate_placeholder: dropout_rate,
-                            self.adaptive_learning_rate_placeholder: learning_rate
+                            self.adaptive_learning_rate_placeholder: learning_rate,
+                            self.recurrent_depth_placeholder: learning_depth
                         }
                     )
 
@@ -573,7 +577,8 @@ class RCNN:
                 val_acc, accuracies = sess.run(
                     [self.accuracy, self.summaries],
                     feed_dict={
-                        self.rate_placeholder: 0
+                        self.rate_placeholder: 0,
+                        self.recurrent_depth_placeholder: test_depth
                     }
                 )
 
