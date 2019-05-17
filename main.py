@@ -11,7 +11,8 @@ VAL_SET_PERCENT_LEN = 10
 
 def parse_train_args(args):
     parser = ArgumentParser()
-    parser.add_argument('-d', '--depth', type=int)
+    parser.add_argument('-dl', '--depth-learning', type=int)
+    parser.add_argument('-dt', '--depth-test', type=int)
     parser.add_argument('-f', '--adaptive-learning-factor', type=float)
     parser.add_argument('-b', '--batch-size', type=int)
 
@@ -200,9 +201,14 @@ def main(argv):
             "dataset has to be one of 'mnist', 'cifar10' or 'cifar100'.")
 
     if not do_grid_search:
+        adaptive_learning_factor = 1
+        depth_learning_ = 3
+        depth_test_ = 3
         if train_args:
-            if train_args.depth is not None:
-                recurrent_depth_ = train_args.depth
+            if train_args.depth_learning is not None:
+                depth_learning_ = train_args.depth_learning
+            if train_args.depth_test is not None:
+                depth_test_ = train_args.depth_test
             if train_args.adaptive_learning_factor:
                 adaptive_learning_factor = train_args.adaptive_learning_factor
             if train_args.batch_size:
@@ -225,7 +231,6 @@ def main(argv):
             learning_rate=learning_rate_test,
             num_filter=num_filter_test_,
             shuf_buf_size=buffer_size_,
-            recurrent_depth=recurrent_depth_
         )
 
         accuracy = rcnn.train(
@@ -236,6 +241,8 @@ def main(argv):
             test_data_feats=test_data_,
             test_data_labels=test_labels_,
             batch_size=batch_size_,
+            training_depth=depth_learning_,
+            test_depth=depth_test_,
             epochs=epochs_,
             create_graph=False,
             print_vars=True,
@@ -286,7 +293,6 @@ def main(argv):
                         learning_rate=learning_rate_test,
                         num_filter=num_filter_test_,
                         shuf_buf_size=buffer_size_,
-                        recurrent_depth=recurrent_depth_
                     )
 
                     accuracy = rcnn.train(
@@ -297,6 +303,8 @@ def main(argv):
                         test_data_feats=test_data_,
                         test_data_labels=test_labels_,
                         batch_size=batch_size_,
+                        training_depth=recurrent_depth_,
+                        test_depth=recurrent_depth_,
                         epochs=epochs_,
                         create_graph=False,
                         print_vars=True,
