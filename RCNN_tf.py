@@ -525,6 +525,10 @@ class RCNN:
                 values = sess.run(variables_names)
                 total_parameters = 0
                 for k, v in zip(variables_names, values):
+                    if self.recurrent_depth == 0:
+                        if "rcl" in str(k[:-2]) and "recurrent" in str(k[:-2]):
+                            continue
+
                     print "Variable: " + k[:-2] + ". Shape: " + str(v.shape)
 
                     variable_parameters = 1
