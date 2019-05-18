@@ -247,13 +247,13 @@ def main(argv):
             create_graph=False,
             print_vars=True,
             adaptive_learning_factor=adaptive_learning_factor,
-            dir_name='final-{}-depth_{}-learningfactor_{}-batch_{}'.format(
+            dir_name='final-{}-depth_{}-learningfactor_{}-batch_{}-train-3-test-6'.format(
                 dataset_name_, recurrent_depth_,
                 adaptive_learning_factor, batch_size_)
         )
         print 'accuracy {}'.format(accuracy)
 
-        fname = 'final-accuracy-{}-{}.txt'.format(dataset_name_, recurrent_depth_, 'w+')
+        fname = 'final-accuracy-{}-{}-train-3-test-6.txt'.format(dataset_name_, recurrent_depth_, 'w+')
         final_accuracy = safe_open(fname)
 
         final_accuracy.write(
