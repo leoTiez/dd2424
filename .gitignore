@@ -2,7 +2,8 @@
 data/*
 .idea/*
 *.pyc
-logs/
+*logs/
+*plots/
 *.save*
 
 [._]*.s[a-v][a-z]

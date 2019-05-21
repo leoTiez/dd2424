@@ -31,71 +31,66 @@ meaning
 - C = number of channels
 
 ### Usage
-The `RecurrentConvolutionalLayer` inherits from the base layer class defined in
-tensorflow keras. Thus, it can be initialized using similar parameters.
-One example is
-
-```python
-RecurrentConvolutionalLayer(
-    32, # Number of parameters
-    (3, 3), # Filter size
-    execution_depth=3, # Number of recurrent iterations
-    input_shape=(32, 32, 3) # Input size
-)
-```
-
-Please remember to adapt the input size when using a new data set.
-The layer can be added to existing network definitions, or can be
-stacked together with other layers.
-
-For easy usage a class implementation is provided, setting up the architecture and
+For an easy usage a class implementation is provided, setting up the architecture and
 the necessary class variables. It can be initialized using
 
 ```python
-rcnn = RCNN(
-        input_shape, # file shape
-        device_name="/cpu:0",   # defining the device which should be used
-                                # Use "/gpu:0" if you want to use the gpu
-                                # implementation instead
-        output_shape=[None, 10], # output shape. Second value is the number of classes
-        learning_rate=.1,
-        num_filter=64,  # Number of filters used for the recurrent and the normal
-                        # convolutional layer
-        shuffle_buffer_size=10000, 
-        conv_layer_filter_shape=[5, 5], # filter shape of the normal conv layer
-        rec_conv_layer_filter_shape=[3, 3], # filter shape of the recurrent conv layers
-        pooling_shape=[3, 3], 
-        pooling_stride_shape=[2, 2]
+rcnn = RCNN_tf.RCNN(
+        input_shape=input_shape_, # shape of the input images
+        output_shape=output_shape_, # shape of the output 
+        processing_unit=processing_unit_, # device responsible for the computation, e.g. CPU or GPU
+        learning_rate=learning_rate_, # initial learning rate value
+        num_filter=num_filter_, # number of feature maps per convolutional filter
+        shuf_buf_size=buffer_size_, # size of the data shuffle buffer 
     )
 ```
 
 To train the network run 
 
 ```python
-rcnn.train(
-            training_data_features,
-            training_data_labels,
-            val_data_features,
-            val_data_labels,
-            batch_size=100,
-            epochs=7,
-            create_graph=True
+accuracy = rcnn.train(
+        train_data_feats=training_data_, # training data
+        train_data_labels=training_labels_, # training labels
+        val_data_feats=val_data_, # validation data
+        val_data_labels=val_label_, # validation labels
+        test_data_feats=test_data_, # test data
+        test_data_labels=test_labels_, # test labels
+        batch_size=batch_size_, # batch size
+        training_depth=depth_learning_, # number of recurrent iterations per RCL while learning
+        test_depth=depth_test_, # number of recurrent iterations per RCL while testing
+        epochs=epochs_, # number of epochs
+        create_graph=False, # flag for creating tensorflow graph
+        print_vars=True, # flag for printing variable dimensions
+        adaptive_learning_factor=adaptive_learning_factor_, # annealing factor for the learning rate
+        dir_name='final-{}-depth_{}-learningfactor_{}-batch_{}'.format(
+            dataset_name_, depth_learning_,
+            adaptive_learning_factor_, batch_size_) # directory for saving the output
     )
 ```
 
 ### Execution
-The main function in `RCNN_tf.py` provides an example how to initialize and use the 
-class `RCNN`. All main files should accept an additional command line parameter
-defining the execution mode (cpu or gpu). Thus, it should be possible to run 
-the main files using the command
+The main function in `main.py` provides an example how to initialize and use the 
+class `RCNN`. The main file can be executed using the following command
 
 ```bash
-python main_file.py cpu
+python main.py "${device}" "${dataset}" -dl "${depth_learning}" -dt "${depth_test}" -f "${annealing_rate}" -b "${batch_size}" \
+            -lls "${learning_data_set_size}" -lts "${testing_data_set_size}" -nf 64 -e "${epochs}"
 ```
 
-or 
+where
+- device: gpu and cpu
+- dataset: name of the data set - mnist, cifar10 or cifar100
+- dl: number of recurrent iterations while learning 
+- dt: number of recurrent iterations while testing
+- f: annealing factor
+- b: batch size
+- lls: data set size for the training phase. If nothing is passed the whole data set is used
+- lts: data set size for the testing phase. If nothing is passed the whole data set is used
+- nf: number of filters per convolutional layer
+- e: number of epochs
 
+There is one example file for performing a grid search:
 ```bash
-python main_file.py gpu
+bash grid-search-all.sh
 ```
 
