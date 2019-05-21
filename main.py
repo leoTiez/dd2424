@@ -15,6 +15,11 @@ def parse_train_args(args):
     parser.add_argument('-dt', '--depth-test', type=int)
     parser.add_argument('-f', '--adaptive-learning-factor', type=float)
     parser.add_argument('-b', '--batch-size', type=int)
+    parser.add_argument('-lls', '--length-learning-set', type=int)
+    parser.add_argument('-lts', '--length-testing-set', type=int)
+    parser.add_argument('-nf', '--number-filter', type=int)
+    parser.add_argument('-e', '--epochs', type=int)
+
 
     return parser.parse_args(args)
 
@@ -38,23 +43,35 @@ def main(argv):
         raise ValueError("Device type is not supported. Use either GPU or CPU")
 
     coarse = False
-    do_grid_search = False
     train_args = None
     if len(argv) > 3:
-        if argv[3] == 'grid-search':
-            do_grid_search = True
-            coarse = True
-        else:
-            train_args = parse_train_args(argv[3:])
-            print train_args
+        train_args = parse_train_args(argv[3:])
 
+    depth_learning_ = 3
+    depth_test_ = 5
+    adaptive_learning_factor_ = 0.01
+    batch_size_ = 1
     train_data_length_ = None
     test_data_length_ = None
-
-    if do_grid_search:
-        train_data_length_ = 2000
-        test_data_length_ = 500
-        np.random.seed(12345)
+    num_filter_ = 96
+    epochs_ = None
+    if train_args:
+        if train_args.depth_learning is not None:
+            depth_learning_ = train_args.depth_learning
+        if train_args.depth_test is not None:
+            depth_test_ = train_args.depth_test
+        if train_args.adaptive_learning_factor is not None:
+            adaptive_learning_factor_ = train_args.adaptive_learning_factor
+        if train_args.batch_size is not None:
+            batch_size_ = train_args.batch_size
+        if train_args.length_learning_set is not None:
+            train_data_length_ = train_args.length_learning_set
+        if train_args.length_testing_set is not None:
+            test_data_length_ = train_args.length_testing_set
+        if train_args.number_filter is not None:
+            num_filter_ = train_args.number_filter
+        if train_args.epochs is not None:
+            epochs_ = train_args.epochs
 
     dataset_name_ = argv[2]
     if dataset_name_.upper() == "MNIST":
@@ -62,11 +79,9 @@ def main(argv):
         input_shape_ = [None, 28, 28, 1]
         output_shape_ = [None, 10]
         learning_rate_ = .0005
-        epochs_ = 12
-        batch_size_ = 1
-        num_filter_ = 64
+        if epochs_ is not None:
+            epochs_ = 12
         buffer_size_ = 10000
-        recurrent_depth_ = 3
 
         training_data_, training_labels_ = data_loader(
             "mnist",
@@ -102,11 +117,9 @@ def main(argv):
 
         output_shape_ = [None, 10]
         learning_rate_ = .0005
-        epochs_ = 25
-        batch_size_ = 1
-        num_filter_ = 96
+        if epochs_ is not None:
+            epochs_ = 25
         buffer_size_ = 10000
-        recurrent_depth_ = 3
 
         if not use_grayscale:
             training_data_ = np.empty((0, 32, 32, 3))
@@ -162,11 +175,9 @@ def main(argv):
             output_shape_ = [None, 100]
 
         learning_rate_ = .0001
-        epochs_ = 25
-        batch_size_ = 1
-        num_filter_ = 96
+        if epochs_ is not None:
+            epochs_ = 25
         buffer_size_ = 10000
-        recurrent_depth_ = 3
 
         training_data_, training_labels_ = data_loader(
             "cifar100",
@@ -200,130 +211,49 @@ def main(argv):
         raise Exception(
             "dataset has to be one of 'mnist', 'cifar10' or 'cifar100'.")
 
-    if not do_grid_search:
-        adaptive_learning_factor = 1
-        depth_learning_ = 3
-        depth_test_ = 3
-        if train_args:
-            if train_args.depth_learning is not None:
-                depth_learning_ = train_args.depth_learning
-            if train_args.depth_test is not None:
-                depth_test_ = train_args.depth_test
-            if train_args.adaptive_learning_factor:
-                adaptive_learning_factor = train_args.adaptive_learning_factor
-            if train_args.batch_size:
-                batch_size_ = train_args.batch_size
 
-        if recurrent_depth_ == 0:
-            num_filter_test_ = 128
-        else:
-            num_filter_test_ = num_filter_
+    # we increase batch size by a factor of k
+    learning_rate_to_batch_size_ = learning_rate_ * np.sqrt(batch_size_)
 
-        # we increase batch size by a factor of k
-        learning_rate_test = learning_rate_ * np.sqrt(batch_size_)
+    rcnn = RCNN_tf.RCNN(
+        input_shape=input_shape_,
+        output_shape=output_shape_,
+        processing_unit=processing_unit_,
+        learning_rate=learning_rate_to_batch_size_,
+        num_filter=num_filter_,
+        shuf_buf_size=buffer_size_,
+    )
 
-        print recurrent_depth_, adaptive_learning_factor, batch_size_
+    accuracy = rcnn.train(
+        train_data_feats=training_data_,
+        train_data_labels=training_labels_,
+        val_data_feats=val_data_,
+        val_data_labels=val_label_,
+        test_data_feats=test_data_,
+        test_data_labels=test_labels_,
+        batch_size=batch_size_,
+        training_depth=depth_learning_,
+        test_depth=depth_test_,
+        epochs=epochs_,
+        create_graph=False,
+        print_vars=True,
+        adaptive_learning_factor=adaptive_learning_factor_,
+        dir_name='final-{}-depth_{}-learningfactor_{}-batch_{}'.format(
+            dataset_name_, depth_learning_,
+            adaptive_learning_factor_, batch_size_)
+    )
+    print 'accuracy {}'.format(accuracy)
 
-        rcnn = RCNN_tf.RCNN(
-            input_shape=input_shape_,
-            output_shape=output_shape_,
-            processing_unit=processing_unit_,
-            learning_rate=learning_rate_test,
-            num_filter=num_filter_test_,
-            shuf_buf_size=buffer_size_,
+    fname = 'final-accuracy-{}-{}.txt'.format(dataset_name_, depth_learning_, 'w+')
+    final_accuracy = safe_open(fname)
+
+    final_accuracy.write(
+        'depth = {}, learningfactor = {}, batch {}: {}\n'.format(
+            depth_learning_, adaptive_learning_factor_,
+            batch_size_, accuracy
         )
-
-        accuracy = rcnn.train(
-            train_data_feats=training_data_,
-            train_data_labels=training_labels_,
-            val_data_feats=val_data_,
-            val_data_labels=val_label_,
-            test_data_feats=test_data_,
-            test_data_labels=test_labels_,
-            batch_size=batch_size_,
-            training_depth=depth_learning_,
-            test_depth=depth_test_,
-            epochs=epochs_,
-            create_graph=False,
-            print_vars=True,
-            adaptive_learning_factor=adaptive_learning_factor,
-            dir_name='final-{}-depth_{}-learningfactor_{}-batch_{}'.format(
-                dataset_name_, recurrent_depth_,
-                adaptive_learning_factor, batch_size_)
-        )
-        print 'accuracy {}'.format(accuracy)
-
-        fname = 'final-accuracy-{}-{}.txt'.format(dataset_name_, recurrent_depth_, 'w+')
-        final_accuracy = safe_open(fname)
-
-        final_accuracy.write(
-            'depth = {}, learningfactor = {}, batch {}: {}\n'.format(
-                recurrent_depth_, adaptive_learning_factor,
-                batch_size_, accuracy
-            )
-        )
-        final_accuracy.close()
-
-    else:
-        fname = 'accuracies-{}.txt'.format(dataset_name_, 'w+')
-        accuracies = safe_open(fname)
-        epochs_ = 10
-        for recurrent_depth_ in [0, 3, 6]:
-            for adaptive_learning_factor in [0.01, 0.1, 1]:
-                for batch_size_ in [1, 32, 100]:
-                    tf.reset_default_graph()
-                    # as per the paper to set the number of weights to be roughly
-                    # the same
-                    print 'Training with depth {} and learning factor {}'.format(
-                        recurrent_depth_, adaptive_learning_factor
-                    )
-
-                    if recurrent_depth_ == 0:
-                        num_filter_test_ = 128
-                    else:
-                        num_filter_test_ = num_filter_
-
-                    # we increase batch size by a factor of k
-                    learning_rate_test = learning_rate_ * np.sqrt(batch_size_)
-
-                    rcnn = RCNN_tf.RCNN(
-                        input_shape=input_shape_,
-                        output_shape=output_shape_,
-                        processing_unit=processing_unit_,
-                        learning_rate=learning_rate_test,
-                        num_filter=num_filter_test_,
-                        shuf_buf_size=buffer_size_,
-                    )
-
-                    accuracy = rcnn.train(
-                        train_data_feats=training_data_,
-                        train_data_labels=training_labels_,
-                        val_data_feats=val_data_,
-                        val_data_labels=val_label_,
-                        test_data_feats=test_data_,
-                        test_data_labels=test_labels_,
-                        batch_size=batch_size_,
-                        training_depth=recurrent_depth_,
-                        test_depth=recurrent_depth_,
-                        epochs=epochs_,
-                        create_graph=False,
-                        print_vars=True,
-                        adaptive_learning_factor=adaptive_learning_factor,
-                        dir_name='{}-depth_{}-learningfactor_{}-batch_{}'.format(
-                            dataset_name_, recurrent_depth_,
-                            adaptive_learning_factor, batch_size_)
-                    )
-                    print 'accuracy {}'.format(accuracy)
-
-                    accuracies.write(
-                        'depth = {}, learningfactor = {}, batch {}: {}\n'.format(
-                            recurrent_depth_, adaptive_learning_factor,
-                            batch_size_, accuracy
-                        )
-                    )
-                    # in case we're interrupted we'll save our progress somewhat
-                    accuracies.flush()
-        accuracies.close()
+    )
+    final_accuracy.close()
 
 
 if __name__ == '__main__':
